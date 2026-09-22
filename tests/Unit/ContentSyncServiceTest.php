@@ -1,0 +1,50 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\AdhkarCollection;
+use App\Models\AdhkarItem;
+use App\Services\ContentSyncService;
+use Tests\TestCase;
+
+class ContentSyncServiceTest extends TestCase
+{
+    public function test_sync_is_idempotent_and_excludes_warning_section(): void
+    {
+        $sync = app(ContentSyncService::class);
+        $first = $sync->sync();
+        $second = $sync->sync();
+
+        $this->assertGreaterThan(0, $first['created']);
+        $this->assertSame(0, $second['created']);
+        $this->assertSame(0, $second['updated']);
+        $this->assertGreaterThan(0, $second['unchanged']);
+
+        $this->assertFalse(AdhkarItem::query()->where('arabic_text', 'like', '%مخّ العبادة%')->exists());
+        $this->assertFalse(AdhkarItem::query()->where('title', 'like', '%تحتاج تنبيه%')->exists());
+
+        $this->assertTrue(AdhkarCollection::query()->where('key', 'morning_short')->exists());
+        $this->assertTrue(AdhkarItem::query()->where('key', 'morning.01')->exists());
+        $this->assertTrue(AdhkarItem::query()->where('key', 'additional.01')->exists());
+
+        $short = AdhkarCollection::query()->where('key', 'morning_short')->first();
+        $full = AdhkarCollection::query()->where('key', 'morning_full')->first();
+        $this->assertGreaterThan($short->items()->count(), $full->items()->count());
+    }
+
+    public function test_hash_change_bumps_content_version(): void
+    {
+        $sync = app(ContentSyncService::class);
+        $sync->sync();
+
+        $item = AdhkarItem::query()->where('key', 'morning.01')->first();
+        $originalVersion = $item->content_version;
+        $item->update(['arabic_text' => 'نص مختلف مؤقت', 'source_hash' => 'old']);
+
+        $sync->sync();
+        $item->refresh();
+
+        $this->assertSame($originalVersion + 1, $item->content_version);
+        $this->assertStringContainsString('اللَّهُ لَا إِلَهَ إِلَّا هُوَ', $item->arabic_text);
+    }
+}

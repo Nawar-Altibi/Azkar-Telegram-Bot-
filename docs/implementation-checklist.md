@@ -1,0 +1,29 @@
+# Implementation checklist
+
+- [x] Inspect PHP version (8.2.12) and pin Laravel 11 / PHP ^8.2
+- [x] Bootstrap Laravel 11 application
+- [x] Copy adhkar markdown into `resources/adhkar/`
+- [x] Environment variables in `.env.example`
+- [x] Migrations for users, collections, items, pivot, reminder_logs, telegram_updates
+- [x] Models, enums, factories
+- [x] Structured seed data (textually/semantically faithful)
+- [x] `adhkar:sync`
+- [x] Telegram client, DTOs, keyboards
+- [x] Webhook controller + secret middleware
+- [x] `ProcessTelegramUpdateJob`
+- [x] `adhkar:recover-stale`
+- [x] `telegram:poll`
+- [x] Update processor + commands
+- [x] Onboarding
+- [x] Settings, pause, resume
+- [x] Reminder schedule calculator
+- [x] Atomic claim + recovery
+- [x] Send job + chunking + version snapshot
+- [x] `/today` and additional browsing
+- [x] Completion callback
+- [x] Automated tests
+- [x] Scheduler definitions
+- [x] Supervisor / cron examples
+- [x] `telegram:webhook:set`
+- [x] Docs package
+- [ ] Production smoke test on a real Telegram account (requires a live bot token and HTTPS URL)
