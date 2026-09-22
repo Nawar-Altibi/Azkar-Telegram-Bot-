@@ -24,6 +24,10 @@
 - [x] Automated tests
 - [x] Scheduler definitions
 - [x] Supervisor / cron examples
+- [x] systemd worker unit and nginx TLS example
+- [x] production `.env` example (`deploy/production.env.example`)
 - [x] `telegram:webhook:set`
+- [x] `adhkar:smoke` preflight (optional `--live` getMe / getWebhookInfo)
 - [x] Docs package
-- [ ] Production smoke test on a real Telegram account (requires a live bot token and HTTPS URL)
+- [x] Production smoke-test procedure documented (`docs/testing-and-deployment.md`)
+- [ ] Operator live `/start` reply on a real Telegram account (requires `TELEGRAM_BOT_TOKEN` + HTTPS; webhook 200 is not enough)

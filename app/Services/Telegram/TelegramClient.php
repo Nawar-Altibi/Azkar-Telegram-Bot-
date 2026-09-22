@@ -62,6 +62,22 @@ class TelegramClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function getMe(): array
+    {
+        return $this->call('getMe', []);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getWebhookInfo(): array
+    {
+        return $this->call('getWebhookInfo', []);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getUpdates(int $offset = 0, int $timeout = 25): array
