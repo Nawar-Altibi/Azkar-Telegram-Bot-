@@ -35,7 +35,10 @@ Or expose HTTPS and run:
 php artisan serve
 php artisan queue:work --tries=3 --backoff=5,30,120
 php artisan telegram:webhook:set
+php artisan adhkar:smoke --live
 ```
+
+Production files: `deploy/` (cron, Supervisor, systemd, nginx, env example). See [docs/testing-and-deployment.md](docs/testing-and-deployment.md). After webhook registration, send `/start` in Telegram and confirm a reply. Webhook `200` is not enough — the queue worker must be running.
 
 ## Content
 
