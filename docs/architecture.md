@@ -19,11 +19,13 @@
 
 ## Reminder guarantee
 
-Claim insert + next-occurrence advance run in one DB transaction. The send job is dispatched only if that transaction commits. Unique `(user_id, reminder_type, scheduled_local_date)` is the duplicate guard. Stale `pending` rows are recovered; after 5 attempts they are marked `dispatch_exhausted_retries` and never silently dropped.
+Claim insert + next-occurrence advance run in one DB transaction. The send job is dispatched only if that transaction commits. Unique `(user_id, reminder_type, scheduled_local_date)` is the duplicate guard. The job sends one nudge, then marks the log `sent`. Start claims the same row with `lockForUpdate()` and stores the content snapshot before any chunk. `collection_key` is the collection that gets read, not the user's later mode.
+
+`reminder_stale_minutes` must exceed the Telegram HTTP timeout (`telegram.timeout`), expected queue latency, and a processing buffer, so recovery does not race a request still in flight. Recovery re-dispatches only a stale pending log whose `last_dispatch_attempt_at` is still null. If an outbound attempt was recorded and the row is still pending after the window, it is marked `nudge_unconfirmed` and not resent. Never-attempted stale logs still retry until `dispatch_exhausted_retries`.
 
 ## Content
 
-Markdown in `resources/adhkar/` is editorial source. `database/data/adhkar/*.php` is the machine input. `adhkar:sync` upserts by stable `key`, hashes canonical fields, bumps `content_version` on change, and never deletes. Reminder logs store `content_version_map` + `content_snapshot_hash` at send time.
+Markdown in `resources/adhkar/` is editorial source. `database/data/adhkar/*.php` is the machine input. `adhkar:sync` upserts by stable `key`, hashes canonical fields, bumps `content_version` on change, and never deletes. `snapshotVersions()` sorts by collection order then item key and hashes that canonical JSON. The same order and versions always produce the same hash. The snapshot is written when Start is claimed, before the first chunk, and is not a completion flag.
 
 ## Security
 

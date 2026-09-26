@@ -5,17 +5,19 @@ namespace App\Services;
 use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
 use App\Models\User;
+use App\Support\TimezoneCatalog;
 use InvalidArgumentException;
 
 class UserSettingsService
 {
-    public function updateTimezone(User $user, string $timezone): User
+    public function updateTimezone(User $user, string $timezone, ?string $label = null): User
     {
         if (! in_array($timezone, timezone_identifiers_list(), true)) {
             throw new InvalidArgumentException('invalid_timezone');
         }
 
         $user->timezone = $timezone;
+        $user->timezone_label = $label ?: TimezoneCatalog::labelForTimezone($timezone);
         $this->recalculateNextReminders($user);
         $user->save();
 

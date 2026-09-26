@@ -34,6 +34,16 @@ class AdditionalAndCompletionTest extends TestCase
         $this->assertTrue(AdhkarItem::query()->where('key', 'additional.01')->exists());
     }
 
+    public function test_additional_menu_is_grouped_and_never_scheduled(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramMessagePayload('🌟 أذكار إضافية', 12));
+
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:prayer'));
+        $this->assertSame(0, ReminderLog::query()->where('collection_key', 'additional')->count());
+    }
+
     public function test_completion_callback_is_idempotent(): void
     {
         $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
@@ -41,6 +51,10 @@ class AdditionalAndCompletionTest extends TestCase
             'user_id' => $user->id,
             'status' => ReminderLogStatus::Sent,
             'sent_at' => now(),
+            'reading_started_at' => now(),
+            'scheduled_local_date' => now()->timezone('Asia/Damascus')->toDateString(),
+            'content_snapshot_hash' => str_repeat('ab', 32),
+            'content_version_map' => [['order' => 1, 'key' => 'morning.01', 'content_version' => 1]],
         ]);
 
         $this->process($this->telegramCallbackPayload('reminder:done:'.$log->id, 40));

@@ -47,6 +47,23 @@ class SettingsPauseResumeTest extends TestCase
         $this->assertTrue($user->fresh()->reminders_enabled);
     }
 
+    public function test_settings_back_opens_the_reading_menu(): void
+    {
+        User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+        ]);
+
+        $this->process($this->telegramCallbackPayload('settings:close', 30));
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'editMessageText')
+                && str_contains((string) ($request['text'] ?? ''), 'ماذا تريد أن تقرأ')
+                && str_contains((string) ($request['reply_markup'] ?? ''), 'today:morning');
+        });
+        Http::assertNotSent(fn ($request) => ($request['text'] ?? '') === 'تم');
+    }
+
     public function test_pause_before_onboarding_points_to_start(): void
     {
         User::factory()->newUser()->create([

@@ -114,10 +114,26 @@ class ReminderDispatchService
 
         ReminderLog::query()
             ->where('status', ReminderLogStatus::Pending)
-            ->where('created_at', '<=', $threshold)
-            ->where('dispatch_attempts', '<', $maxAttempts)
+            ->where(function ($query) use ($threshold) {
+                $query->where(function ($inner) use ($threshold) {
+                    $inner->whereNull('last_dispatch_attempt_at')
+                        ->where('created_at', '<=', $threshold);
+                })->orWhere(function ($inner) use ($threshold) {
+                    $inner->whereNotNull('last_dispatch_attempt_at')
+                        ->where('last_dispatch_attempt_at', '<=', $threshold);
+                });
+            })
             ->orderBy('id')
             ->each(function (ReminderLog $log) use ($maxAttempts, &$recovered) {
+                if ($log->last_dispatch_attempt_at !== null) {
+                    $log->update([
+                        'status' => ReminderLogStatus::Failed,
+                        'error_message' => 'nudge_unconfirmed',
+                    ]);
+
+                    return;
+                }
+
                 $log->increment('dispatch_attempts');
                 $log->refresh();
 

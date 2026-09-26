@@ -26,8 +26,37 @@ Cron → schedule:run every minute
     → adhkar:dispatch-due-reminders (atomic claim + after-commit dispatch)
     → adhkar:recover-stale every 5 minutes
 
-Queue worker → SendAdhkarReminderJob / ProcessTelegramUpdateJob
+Queue worker → SendAdhkarReminderJob (one nudge) / ProcessTelegramUpdateJob
+             → Start callback claims the log, snapshots collection_key, then sends chunks
 ```
+
+UX behavior is documented in [Bot flows](bot-flows.md). There is no reading-resume cursor in this version.
+
+## First-time path
+
+```text
+/start
+    ↓
+🌿 First-time tutorial
+    ↓
+🚀 ابدأ الإعداد
+    ↓
+🌍 اختر منطقتك
+    ↓
+🌅 وقت الصباح
+    ↓
+🌙 وقت المساء
+    ↓
+📖 مختصر / كامل
+    ↓
+✅ تم ضبط التذكيرات
+    ↓
+🏠 Main keyboard
+```
+
+The tutorial appears only while `onboarding_state` is `new`. A returning `/start` does not show it. `/today` is manual and does not create reminder completion state. Scheduled Start stays on the log's `collection_key`. `📥 أرسل الورد كاملًا` sends the list; it does not persist a copy. America offers four zones only: نيويورك، شيكاغو، دنفر، لوس أنجلوس. Interactive reading stays separate from that full-ward send.
+
+`morning.salat_nabi` and `evening.salat_nabi` are flagged for source review against `adhkar-research.md` §24 and were not rewritten in the UX pass.
 
 ## Local commands
 

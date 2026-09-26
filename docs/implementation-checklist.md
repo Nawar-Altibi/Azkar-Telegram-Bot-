@@ -18,9 +18,16 @@
 - [x] Settings, pause, resume
 - [x] Reminder schedule calculator
 - [x] Atomic claim + recovery
-- [x] Send job + chunking + version snapshot
-- [x] `/today` and additional browsing
-- [x] Completion callback
+- [x] Send job sends one nudge; Start claims and snapshots `collection_key` before chunks
+- [x] Chunked reading with a progress line; Done only for an owned, current-day, started log
+- [x] `/today` reads the current mode immediately and does not write a reminder log
+- [x] Additional adhkar grouped for browsing, never scheduled
+- [x] First-time tutorial on `/start` for `onboarding_state = new` only; `ابدأ الإعداد` edits into region selection with no Back button
+- [x] `📥 أرسل الورد كاملًا` sends ordinary messages and does not claim a saved copy
+- [x] Reminder nudge includes an approximate duration; Start stays bound to `collection_key`
+- [x] Friendly timezone label, America region step (four zones only), back/cancel, Arabic-digit times
+- [ ] Source review: `morning.salat_nabi` / `evening.salat_nabi` («الصلاة على النبي ﷺ — 10 مرات») does not match `adhkar-research.md` §24 wording or virtue. Left unchanged pending an explicit source-backed correction.
+- [x] Stale recovery does not resend an outbound-uncertain nudge
 - [x] Automated tests
 - [x] Scheduler definitions
 - [x] Supervisor / cron examples

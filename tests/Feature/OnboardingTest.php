@@ -27,24 +27,55 @@ class OnboardingTest extends TestCase
 
         $user = User::query()->where('telegram_id', 1001)->first();
         $this->assertNotNull($user);
-        $this->assertSame(OnboardingState::WaitingTimezone, $user->onboarding_state);
+        $this->assertSame(OnboardingState::New, $user->onboarding_state);
+        $this->assertNull($user->timezone);
+        $this->assertNull($user->morning_time);
+        $this->assertNull($user->evening_time);
+        $this->assertFalse($user->reminders_enabled);
+        Http::assertSent(function ($request) {
+            $text = (string) ($request['text'] ?? '');
+            $markup = (string) ($request['reply_markup'] ?? '');
 
-        $this->process($this->telegramCallbackPayload('onb:tz:1', 2));
+            return str_contains($request->url(), 'sendMessage')
+                && str_contains($text, 'أهلاً بك في بوت الأذكار')
+                && str_contains($text, 'أذكار الصباح')
+                && str_contains($text, 'أذكار المساء')
+                && str_contains($text, 'ورد مختصر')
+                && str_contains($text, 'ورد كامل')
+                && str_contains($text, 'أذكار إضافية')
+                && str_contains($markup, 'onb:begin')
+                && str_contains($markup, 'ابدأ الإعداد')
+                && ! str_contains($markup, 'nav:back');
+        });
+
+        $this->process($this->telegramCallbackPayload('onb:begin', 2));
+        $user->refresh();
+        $this->assertSame(OnboardingState::WaitingTimezone, $user->onboarding_state);
+        $this->assertNull($user->timezone);
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($request->url(), 'editMessageText')
+                && str_contains((string) ($request['text'] ?? ''), 'اختر منطقتك')
+                && ! str_contains($markup, 'nav:back');
+        });
+
+        $this->process($this->telegramCallbackPayload('onb:tz:0', 3));
         $user->refresh();
         $this->assertSame('Asia/Damascus', $user->timezone);
         $this->assertSame(OnboardingState::WaitingMorningTime, $user->onboarding_state);
 
-        $this->process($this->telegramCallbackPayload('onb:time:morning:0600', 3));
+        $this->process($this->telegramCallbackPayload('onb:time:morning:0600', 4));
         $user->refresh();
         $this->assertSame('06:00:00', $user->morning_time);
         $this->assertSame(OnboardingState::WaitingEveningTime, $user->onboarding_state);
 
-        $this->process($this->telegramCallbackPayload('onb:time:evening:1800', 4));
+        $this->process($this->telegramCallbackPayload('onb:time:evening:1800', 5));
         $user->refresh();
         $this->assertSame('18:00:00', $user->evening_time);
         $this->assertSame(OnboardingState::WaitingMode, $user->onboarding_state);
 
-        $this->process($this->telegramCallbackPayload('onb:mode:short', 5));
+        $this->process($this->telegramCallbackPayload('onb:mode:short', 6));
         $user->refresh();
         $this->assertSame(OnboardingState::Completed, $user->onboarding_state);
         $this->assertTrue($user->reminders_enabled);
@@ -56,14 +87,192 @@ class OnboardingTest extends TestCase
     public function test_invalid_custom_time_is_reprompted(): void
     {
         $this->process($this->telegramMessagePayload('/start', 1));
-        $this->process($this->telegramCallbackPayload('onb:tz:1', 2));
+        $this->process($this->telegramCallbackPayload('onb:tz:0', 2));
         $this->process($this->telegramCallbackPayload('onb:time:morning:custom', 3));
         $this->process($this->telegramMessagePayload('not-a-time', 4));
 
         $user = User::query()->where('telegram_id', 1001)->first();
         $this->assertSame(OnboardingState::WaitingMorningTime, $user->onboarding_state);
         $this->assertNull($user->morning_time);
-        Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', 'HH:MM') || str_contains($request['text'] ?? '', '06:30'));
+        Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', '05:30'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'HH:MM'));
+    }
+
+    public function test_america_asks_for_a_region_before_saving(): void
+    {
+        $index = collect(config('adhkar.timezones'))->search(fn ($row) => ($row['label'] ?? '') === 'أمريكا');
+        $this->assertNotFalse($index);
+
+        $this->process($this->telegramMessagePayload('/start', 1));
+        $this->process($this->telegramCallbackPayload('onb:begin', 2));
+        $this->process($this->telegramCallbackPayload('onb:tz:'.$index, 3));
+
+        $user = User::query()->where('telegram_id', 1001)->first();
+        $this->assertNull($user->timezone);
+        $this->assertSame(OnboardingState::WaitingTimezone, $user->onboarding_state);
+
+        $this->process($this->telegramCallbackPayload('onb:tzr:'.$index.':0', 4));
+        $user->refresh();
+        $this->assertSame('America/New_York', $user->timezone);
+        $this->assertStringContainsString('نيويورك', (string) $user->timezone_label);
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'America/New_York'));
+    }
+
+    public function test_back_and_arabic_time_during_onboarding(): void
+    {
+        $this->process($this->telegramMessagePayload('/start', 1));
+        $this->process($this->telegramCallbackPayload('onb:tz:0', 2));
+        $this->process($this->telegramCallbackPayload('onb:time:morning:custom', 3));
+        $this->process($this->telegramCallbackPayload('nav:back', 4));
+
+        $user = User::query()->where('telegram_id', 1001)->first();
+        $this->assertNull($user->awaiting_input);
+        $this->assertSame(OnboardingState::WaitingMorningTime, $user->onboarding_state);
+
+        $this->process($this->telegramCallbackPayload('onb:time:morning:custom', 5));
+        $this->process($this->telegramMessagePayload('٥:٣٠', 6));
+        $user->refresh();
+        $this->assertSame('05:30:00', $user->morning_time);
+        $this->assertSame(OnboardingState::WaitingEveningTime, $user->onboarding_state);
+    }
+
+    public function test_onboarding_custom_time_offers_back_without_cancel(): void
+    {
+        $this->process($this->telegramMessagePayload('/start', 1));
+        $this->process($this->telegramCallbackPayload('onb:tz:0', 2));
+        $this->process($this->telegramCallbackPayload('onb:time:morning:custom', 3));
+
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($markup, 'nav:back')
+                && str_contains((string) ($request['text'] ?? ''), '05:30')
+                && ! str_contains($markup, 'nav:cancel');
+        });
+    }
+
+    public function test_settings_custom_time_keeps_cancel_and_confirms_ambiguous_evening_hour(): void
+    {
+        $user = User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'evening_time' => '18:00:00',
+        ]);
+
+        $this->process($this->telegramCallbackPayload('onb:time:evening:custom', 1));
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($markup, 'nav:back') && str_contains($markup, 'nav:cancel');
+        });
+
+        $this->process($this->telegramMessagePayload('08:00', 2));
+        $user->refresh();
+        $this->assertSame('18:00:00', $user->evening_time);
+        $this->assertSame('settings:evening_time_confirm', $user->awaiting_input);
+
+        $this->process($this->telegramCallbackPayload('onb:time:evening:2000', 3));
+        $user->refresh();
+        $this->assertSame('20:00:00', $user->evening_time);
+        $this->assertNull($user->awaiting_input);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), '8:00 م'));
+    }
+
+    public function test_returning_start_does_not_restart_onboarding(): void
+    {
+        $user = User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'timezone_label' => 'سوريا',
+            'onboarding_state' => OnboardingState::Completed,
+        ]);
+
+        $this->process($this->telegramMessagePayload('/start', 1));
+
+        $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بعودتك'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'سوريا'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin'));
+    }
+
+    public function test_explain_button_resends_the_guide_without_restarting_setup(): void
+    {
+        $user = User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'timezone_label' => 'سوريا',
+            'onboarding_state' => OnboardingState::Completed,
+            'reminders_enabled' => true,
+        ]);
+
+        $this->process($this->telegramMessagePayload('🌿 شرح البوت', 1));
+
+        $fresh = $user->fresh();
+        $this->assertSame(OnboardingState::Completed, $fresh->onboarding_state);
+        $this->assertTrue($fresh->reminders_enabled);
+        $this->assertSame('سوريا', $fresh->timezone_label);
+        Http::assertSent(function ($request) {
+            $text = (string) ($request['text'] ?? '');
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($text, 'شرح البوت')
+                && str_contains($text, 'أذكار الصباح')
+                && str_contains($text, 'أذكار المساء')
+                && str_contains($text, 'أذكار إضافية')
+                && ! str_contains($text, 'سنضبط معًا')
+                && ! str_contains($markup, 'onb:begin');
+        });
+
+        $this->process($this->telegramCallbackPayload('guide:explain', 2));
+        $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
+    }
+
+    public function test_start_during_onboarding_resumes_the_current_step(): void
+    {
+        $user = User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'onboarding_state' => OnboardingState::WaitingEveningTime,
+            'timezone' => 'Asia/Damascus',
+            'timezone_label' => 'سوريا',
+            'morning_time' => '06:00:00',
+            'evening_time' => null,
+            'reminders_enabled' => false,
+        ]);
+
+        $this->process($this->telegramMessagePayload('/start', 1));
+
+        $fresh = $user->fresh();
+        $this->assertSame(OnboardingState::WaitingEveningTime, $fresh->onboarding_state);
+        $this->assertSame('06:00:00', $fresh->morning_time);
+        $this->assertNull($fresh->evening_time);
+        $this->assertSame('سوريا', $fresh->timezone_label);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'متى تفضّل تذكير أذكار المساء'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
+    }
+
+    public function test_settings_timezone_keyboard_keeps_back(): void
+    {
+        User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'onboarding_state' => OnboardingState::Completed,
+            'timezone_label' => 'سوريا',
+        ]);
+
+        $this->process($this->telegramCallbackPayload('settings:timezone', 1));
+
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($request->url(), 'sendMessage')
+                && str_contains((string) ($request['text'] ?? ''), 'اختر منطقتك')
+                && str_contains($markup, 'nav:back')
+                && ! str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus');
+        });
     }
 
     /**

@@ -36,12 +36,32 @@ class ReminderDeliveryAndVersioningTest extends TestCase
             'reminder_type' => ReminderType::Morning,
             'collection_key' => 'morning_short',
             'status' => ReminderLogStatus::Pending,
+            'scheduled_local_date' => now()->timezone('Asia/Damascus')->toDateString(),
         ]);
 
         SendAdhkarReminderJob::dispatchSync($log->id);
         $log->refresh();
 
         $this->assertSame(ReminderLogStatus::Sent, $log->status);
+        $this->assertNull($log->content_snapshot_hash);
+        $this->assertNotNull($log->last_dispatch_attempt_at);
+        Http::assertSent(function ($request) use ($log) {
+            $text = (string) ($request['text'] ?? '');
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($text, 'حان وقت أذكار الصباح')
+                && str_contains($text, 'وردك المختصر يستغرق تقريبًا 5 دقائق.')
+                && str_contains($markup, 'ابدأ القراءة')
+                && str_contains($markup, 'تعديل الوقت')
+                && str_contains($markup, 'reminder:start:'.$log->id);
+        });
+
+        app(\App\Services\Telegram\TelegramUpdateProcessor::class)->handle(
+            $this->telegramCallbackPayload('reminder:start:'.$log->id, 80, 2002)
+        );
+        $log->refresh();
+
+        $this->assertNotNull($log->reading_started_at);
         $this->assertNotEmpty($log->content_version_map);
         $this->assertNotEmpty($log->content_snapshot_hash);
         $originalMap = $log->content_version_map;

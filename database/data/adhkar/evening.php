@@ -25,7 +25,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => 'أُضيفت إلى قائمة الأذكار بناءً على طلب المستخدم، دون إسناد فضل خاص في ملف البحث الأصلي لهذا العدد تحديدًا.',
-        'order' => 0,
+        'order' => 3,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -82,7 +82,7 @@ return [
         'narrator' => null,
         'guidance_note' => 'سمّاه النبي ﷺ «سيد الاستغفار» وعلّمه.',
         'notes' => null,
-        'order' => 3,
+        'order' => 4,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -101,7 +101,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 4,
+        'order' => 5,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -120,7 +120,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 5,
+        'order' => 6,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -139,7 +139,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 6,
+        'order' => 7,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -158,7 +158,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 7,
+        'order' => 8,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -177,7 +177,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 8,
+        'order' => 9,
         'collections' => ['evening_short', 'evening_full'],
     ],
     [
@@ -196,7 +196,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 9,
+        'order' => 10,
         'collections' => ['evening_full'],
     ],
     [
@@ -215,7 +215,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 10,
+        'order' => 11,
         'collections' => ['evening_full'],
     ],
     [
@@ -234,7 +234,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 11,
+        'order' => 12,
         'collections' => ['evening_full'],
     ],
     [
@@ -253,7 +253,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 12,
+        'order' => 13,
         'collections' => ['evening_full'],
     ],
     [
@@ -272,7 +272,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => 'مختلف في الرفع والوقف.',
-        'order' => 13,
+        'order' => 14,
         'collections' => ['evening_full'],
     ],
     [
@@ -291,7 +291,7 @@ return [
         'narrator' => null,
         'guidance_note' => 'ورد أن النبي ﷺ كان لا يدع هذا الدعاء صباحاً ومساءً.',
         'notes' => null,
-        'order' => 14,
+        'order' => 15,
         'collections' => ['evening_full'],
     ],
     [
@@ -310,7 +310,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 15,
+        'order' => 16,
         'collections' => ['evening_full'],
     ],
     [
@@ -329,7 +329,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 16,
+        'order' => 17,
         'collections' => ['evening_full'],
     ],
     [
@@ -348,7 +348,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 17,
+        'order' => 18,
         'collections' => ['evening_full'],
     ],
     [
@@ -367,7 +367,7 @@ return [
         'narrator' => null,
         'guidance_note' => null,
         'notes' => null,
-        'order' => 18,
+        'order' => 19,
         'collections' => ['evening_full'],
     ],
 ];

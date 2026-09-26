@@ -83,6 +83,44 @@ class ReminderDispatchTest extends TestCase
         $this->assertSame('dispatch_exhausted_retries', $log->fresh()->error_message);
     }
 
+    public function test_recovery_does_not_resend_after_an_outbound_attempt(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $log = ReminderLog::factory()->create([
+            'status' => ReminderLogStatus::Pending,
+            'dispatch_attempts' => 1,
+            'last_dispatch_attempt_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(20),
+        ]);
+        $log->created_at = now()->subMinutes(20);
+        $log->save();
+
+        $recovered = app(ReminderDispatchService::class)->recoverStalePending();
+
+        $this->assertSame(0, $recovered);
+        $this->assertSame(ReminderLogStatus::Failed, $log->fresh()->status);
+        $this->assertSame('nudge_unconfirmed', $log->fresh()->error_message);
+        Bus::assertNotDispatched(SendAdhkarReminderJob::class);
+    }
+
+    public function test_recovery_leaves_an_in_flight_attempt_alone(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $log = ReminderLog::factory()->create([
+            'status' => ReminderLogStatus::Pending,
+            'last_dispatch_attempt_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(20),
+        ]);
+        $log->created_at = now()->subMinutes(20);
+        $log->save();
+
+        $recovered = app(ReminderDispatchService::class)->recoverStalePending();
+
+        $this->assertSame(0, $recovered);
+        $this->assertSame(ReminderLogStatus::Pending, $log->fresh()->status);
+        Bus::assertNotDispatched(SendAdhkarReminderJob::class);
+    }
+
     public function test_disabled_users_are_skipped(): void
     {
         Bus::fake();

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
+use App\Services\ReminderScheduleCalculator;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ class User extends Model
         'username',
         'language_code',
         'timezone',
+        'timezone_label',
         'morning_time',
         'evening_time',
         'mode',
@@ -79,6 +81,6 @@ class User extends Model
 
         $raw = is_string($value) ? $value : (string) $value;
 
-        return substr($raw, 0, 5);
+        return ReminderScheduleCalculator::format12Hour($raw);
     }
 }

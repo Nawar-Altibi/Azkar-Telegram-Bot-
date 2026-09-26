@@ -10,12 +10,12 @@ Covered:
 
 - Next-reminder calculation (midnight, DST, invalid time)
 - Content sync idempotency, version bump, exclusion of the warning section
-- Message chunking and version snapshots
+- Message chunking, progress lines, and deterministic version snapshots
 - Webhook 403/400, persist-then-200, duplicate `update_id`
-- Onboarding, settings, pause/resume
-- Atomic claim, duplicate scheduler tick, stale recovery exhaustion
-- Send job snapshot immutability and bot-blocked handling
-- Additional section isolation and completion idempotency
+- Onboarding, America region step, back/cancel, Arabic-digit times, settings, pause/resume
+- Atomic claim, duplicate scheduler tick, stale recovery that does not resend an unconfirmed nudge
+- Nudge-only send job, Start claim on `collection_key`, expired Start/Done, partial chunk failure
+- Additional section grouping and completion idempotency
 - Unique DB constraints
 - Deploy preflight (`adhkar:smoke`) and `GET /up`
 

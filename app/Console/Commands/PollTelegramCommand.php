@@ -18,10 +18,17 @@ class PollTelegramCommand extends Command
         $offset = 0;
 
         while (true) {
-            $updates = $client->getUpdates($offset, 25);
-            foreach ($updates as $update) {
-                $offset = ((int) ($update['update_id'] ?? 0)) + 1;
-                $processor->handle($update);
+            try {
+                $updates = $client->getUpdates($offset, 25);
+                foreach ($updates as $update) {
+                    $offset = ((int) ($update['update_id'] ?? 0)) + 1;
+                    $processor->handle($update);
+                }
+            } catch (\Throwable $e) {
+                $this->warn('Poll error: '.$e->getMessage());
+                sleep(max(2, (int) $this->option('sleep')));
+
+                continue;
             }
 
             sleep((int) $this->option('sleep'));

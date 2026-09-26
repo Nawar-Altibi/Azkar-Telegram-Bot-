@@ -30,6 +30,11 @@ class ContentSyncServiceTest extends TestCase
         $short = AdhkarCollection::query()->where('key', 'morning_short')->first();
         $full = AdhkarCollection::query()->where('key', 'morning_full')->first();
         $this->assertGreaterThan($short->items()->count(), $full->items()->count());
+
+        $morningKeys = $short->items()->pluck('adhkar_items.key')->all();
+        $this->assertSame(['morning.01', 'morning.02', 'morning.salat_nabi'], array_slice($morningKeys, 0, 3));
+        $eveningKeys = AdhkarCollection::query()->where('key', 'evening_short')->first()->items()->pluck('adhkar_items.key')->all();
+        $this->assertSame(['evening.01', 'evening.02', 'evening.salat_nabi'], array_slice($eveningKeys, 0, 3));
     }
 
     public function test_hash_change_bumps_content_version(): void

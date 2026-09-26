@@ -14,6 +14,7 @@ class TelegramClient
         $payload = array_filter([
             'chat_id' => $chatId,
             'text' => $text,
+            'parse_mode' => 'HTML',
             'reply_markup' => $replyMarkup === [] ? null : json_encode($replyMarkup, JSON_UNESCAPED_UNICODE),
         ] + $extra);
 
@@ -43,6 +44,7 @@ class TelegramClient
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'text' => $text,
+            'parse_mode' => 'HTML',
             'reply_markup' => $replyMarkup === [] ? null : json_encode($replyMarkup, JSON_UNESCAPED_UNICODE),
         ]));
     }
@@ -82,10 +84,11 @@ class TelegramClient
      */
     public function getUpdates(int $offset = 0, int $timeout = 25): array
     {
+        // HTTP client must outlive Telegram's long-poll window.
         $result = $this->call('getUpdates', [
             'offset' => $offset,
             'timeout' => $timeout,
-        ]);
+        ], $timeout + 15);
 
         return $result['result'] ?? [];
     }
@@ -94,7 +97,7 @@ class TelegramClient
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function call(string $method, array $payload): array
+    private function call(string $method, array $payload, ?int $timeoutSeconds = null): array
     {
         $token = (string) config('telegram.bot_token');
         if ($token === '') {
@@ -104,7 +107,7 @@ class TelegramClient
         $url = rtrim((string) config('telegram.api_base'), '/').'/bot'.$token.'/'.$method;
 
         /** @var Response $response */
-        $response = Http::timeout((int) config('telegram.timeout', 15))
+        $response = Http::timeout($timeoutSeconds ?? (int) config('telegram.timeout', 15))
             ->acceptJson()
             ->asForm()
             ->post($url, $payload);

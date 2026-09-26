@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -45,7 +46,11 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
     ): void {
         $log = ReminderLog::query()->with('user')->findOrFail($this->reminderLogId);
 
-        if (in_array($log->status, [ReminderLogStatus::Sent, ReminderLogStatus::Completed], true)) {
+        if (in_array($log->status, [ReminderLogStatus::Sent, ReminderLogStatus::Completed, ReminderLogStatus::Skipped], true)) {
+            return;
+        }
+
+        if ($log->status === ReminderLogStatus::Failed && $this->mustNotRetry($log->error_message)) {
             return;
         }
 
@@ -64,33 +69,22 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $items = $collection->items()->where('adhkar_items.active', true)->get();
-        $snapshot = $content->snapshotVersions($items);
-        $messages = $content->buildMessages($collection);
-        $messageIds = [];
+        if (! $this->reserveOutboundAttempt($log)) {
+            return;
+        }
 
         try {
-            foreach ($messages as $index => $message) {
-                $markup = [];
-                $isLast = $index === array_key_last($messages);
-                if ($isLast) {
-                    $markup = $keyboards->completion($log->id);
-                }
+            $result = $telegram->sendMessage(
+                $user->chat_id,
+                $content->nudgeText($log->collection_key),
+                $keyboards->reminderNudge($log->id, $log->reminder_type->value),
+            );
 
-                $result = $telegram->sendMessage($user->chat_id, $message, $markup);
-                $messageIds[] = data_get($result, 'result.message_id');
-
-                if (! $isLast) {
-                    usleep((int) config('adhkar.inter_message_delay_microseconds', 50_000));
-                }
-            }
-
+            $log->refresh();
             $log->update([
                 'status' => ReminderLogStatus::Sent,
                 'sent_at' => now(),
-                'telegram_message_id' => $messageIds,
-                'content_version_map' => $snapshot['content_version_map'],
-                'content_snapshot_hash' => $snapshot['content_snapshot_hash'],
+                'telegram_message_id' => [data_get($result, 'result.message_id')],
                 'error_message' => null,
             ]);
         } catch (TelegramApiException $exception) {
@@ -104,30 +98,73 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $log = ReminderLog::query()->find($this->reminderLogId);
-        if ($log && $log->status === ReminderLogStatus::Pending) {
-            $log->update([
-                'status' => ReminderLogStatus::Failed,
-                'error_message' => Str::limit($exception?->getMessage() ?? 'job_failed', 1000),
-                'retry_count' => $this->attempts(),
-            ]);
+        if ($log === null || $log->status !== ReminderLogStatus::Pending) {
+            return;
         }
+
+        $log->update([
+            'status' => ReminderLogStatus::Failed,
+            'error_message' => $log->last_dispatch_attempt_at !== null
+                ? 'nudge_unconfirmed'
+                : Str::limit($exception?->getMessage() ?? 'job_failed', 1000),
+            'retry_count' => $this->attempts(),
+        ]);
+    }
+
+    private function reserveOutboundAttempt(ReminderLog $log): bool
+    {
+        return (bool) DB::transaction(function () use ($log) {
+            $locked = ReminderLog::query()->whereKey($log->id)->lockForUpdate()->first();
+            if ($locked === null) {
+                return false;
+            }
+
+            if (in_array($locked->status, [ReminderLogStatus::Sent, ReminderLogStatus::Completed, ReminderLogStatus::Skipped], true)) {
+                return false;
+            }
+
+            if ($locked->status === ReminderLogStatus::Failed && $this->mustNotRetry($locked->error_message)) {
+                return false;
+            }
+
+            if ($locked->status === ReminderLogStatus::Pending && $locked->last_dispatch_attempt_at !== null) {
+                $locked->status = ReminderLogStatus::Failed;
+                $locked->error_message = 'nudge_unconfirmed';
+                $locked->save();
+
+                return false;
+            }
+
+            $locked->last_dispatch_attempt_at = now();
+            $locked->dispatch_attempts = (int) $locked->dispatch_attempts + 1;
+            $locked->save();
+
+            return true;
+        });
+    }
+
+    private function mustNotRetry(?string $error): bool
+    {
+        return in_array($error, ['nudge_unconfirmed', 'blocked_by_user'], true);
     }
 
     private function markFailed(ReminderLog $log, User $user, TelegramApiException $exception): void
     {
+        $blocked = $exception->isBlockedByUser();
         $log->update([
             'status' => ReminderLogStatus::Failed,
-            'error_message' => Str::limit($exception->getMessage(), 1000),
+            'error_message' => $blocked ? 'blocked_by_user' : Str::limit($exception->getMessage(), 1000),
             'retry_count' => $this->attempts(),
         ]);
 
-        if ($exception->isBlockedByUser()) {
+        if ($blocked) {
             $user->reminders_enabled = false;
             $user->next_morning_at = null;
             $user->next_evening_at = null;
             $user->save();
             Log::channel('telegram')->info('Disabled reminders after Telegram block', [
                 'user_id' => $user->id,
+                'error' => $exception->getMessage(),
             ]);
         }
     }
