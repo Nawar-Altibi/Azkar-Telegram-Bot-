@@ -40,6 +40,20 @@ php artisan adhkar:smoke --live
 
 Production files: `deploy/` (cron, Supervisor, systemd, nginx, env example). See [docs/testing-and-deployment.md](docs/testing-and-deployment.md). After webhook registration, send `/start` in Telegram and confirm a reply. Webhook `200` is not enough — the queue worker must be running.
 
+## Docker
+
+Compose starts MySQL, the webhook app, the queue worker, and the scheduler. `.env` must already contain `APP_KEY`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_WEBHOOK_SECRET`.
+
+```bash
+docker compose up -d --build
+```
+
+The app listens on http://localhost:8080 (`GET /up` is the health check). The database password defaults to `azkar`; set `MYSQL_PASSWORD` before sharing the machine. Telegram can reach the webhook only through a public HTTPS `APP_URL` or `TELEGRAM_WEBHOOK_URL`. After the stack is healthy:
+
+```bash
+docker compose exec web php artisan telegram:webhook:set
+```
+
 ## Content
 
 Editorial sources: `resources/adhkar/*.md` (copied from `app adhkar/`). Structured seed: `database/data/adhkar/*.php`. Sync with `php artisan adhkar:sync`. Do not invent virtues, counts, or timings.
