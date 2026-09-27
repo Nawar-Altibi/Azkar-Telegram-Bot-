@@ -95,6 +95,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Neon's pooler is PgBouncer in transaction mode: PDO's named statements get
+            // renamed there, and its DEALLOCATE then fails and aborts the open transaction.
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::PGSQL_ATTR_DISABLE_PREPARES => env('DB_PGSQL_DISABLE_PREPARES', true),
+            ]) : [],
         ],
 
         'sqlsrv' => [
