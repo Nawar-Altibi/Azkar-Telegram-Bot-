@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Internal\DatabaseHealthController;
 use App\Http\Controllers\Internal\SchedulerCronController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Middleware\VerifyCronSecret;
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::post('/internal/cron', SchedulerCronController::class)
                 ->middleware(VerifyCronSecret::class)
                 ->name('internal.cron');
+
+            Route::get('/internal/health', DatabaseHealthController::class)
+                ->middleware(VerifyCronSecret::class)
+                ->name('internal.health');
         },
     )
     ->withMiddleware(function (Middleware $middleware) {

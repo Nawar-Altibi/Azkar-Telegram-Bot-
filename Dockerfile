@@ -22,9 +22,12 @@ FROM php:8.3-fpm-bookworm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
+        libpq5 \
+        libpq-dev \
         nginx \
         procps \
-    && docker-php-ext-install pdo_mysql bcmath opcache \
+    && docker-php-ext-install pdo_mysql pdo_pgsql bcmath opcache \
+    && apt-get purge -y --auto-remove libpq-dev \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 

@@ -20,7 +20,29 @@ if [ -z "${APP_KEY:-}" ]; then
     exit 1
 fi
 
+require_production_database() {
+    if [ "${VERCEL_ENV:-}" != "production" ]; then
+        return 0
+    fi
+
+    if [ "${DB_CONNECTION:-}" != "pgsql" ]; then
+        echo "Production requires DB_CONNECTION=pgsql; refusing to start with '${DB_CONNECTION:-unset}'." >&2
+        exit 1
+    fi
+
+    if [ -z "${DB_URL:-}" ] && [ -z "${DATABASE_URL:-}" ]; then
+        echo "Production requires DB_URL or DATABASE_URL for PostgreSQL; neither is set." >&2
+        exit 1
+    fi
+}
+
 wait_for_database() {
+    if [ "${DB_CONNECTION:-sqlite}" = "pgsql" ]; then
+        echo "Waiting for PostgreSQL..."
+        php artisan adhkar:db-status --wait=60 --no-interaction
+        return
+    fi
+
     if [ "${DB_CONNECTION:-sqlite}" != "mysql" ]; then
         return 0
     fi
@@ -61,9 +83,11 @@ if [ -n "${VERCEL:-}" ]; then
 fi
 
 prepare_app() {
+    require_production_database
     wait_for_database
     php artisan migrate --force --no-interaction
     php artisan adhkar:sync --no-interaction
+    php artisan adhkar:db-status --no-interaction
 
     if [ "${APP_ENV:-local}" = "production" ]; then
         php artisan config:cache --no-interaction
