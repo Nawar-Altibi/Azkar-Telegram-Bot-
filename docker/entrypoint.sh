@@ -53,6 +53,13 @@ wait_for_database() {
     exit 1
 }
 
+if [ -n "${VERCEL:-}" ]; then
+    # One container serves webhooks and has no always-on worker.
+    # cron-job.org calls /internal/cron every minute, which runs the scheduler.
+    export QUEUE_CONNECTION=sync
+    export LOG_CHANNEL=stderr
+fi
+
 prepare_app() {
     wait_for_database
     php artisan migrate --force --no-interaction
@@ -63,6 +70,10 @@ prepare_app() {
         php artisan route:cache --no-interaction
         php artisan view:cache --no-interaction
     fi
+
+    # migrate creates the sqlite file as root; php-fpm runs as www-data.
+    chown -R www-data:www-data storage bootstrap/cache database
+    chmod -R ug+rwx storage bootstrap/cache database
 }
 
 case "$role" in

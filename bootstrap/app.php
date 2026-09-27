@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Internal\SchedulerCronController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
+use App\Http\Middleware\VerifyCronSecret;
 use App\Http\Middleware\VerifyTelegramWebhookSecret;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::post('/telegram/webhook/{secret}', TelegramWebhookController::class)
                 ->middleware([VerifyTelegramWebhookSecret::class, 'throttle:telegram-webhook'])
                 ->name('telegram.webhook');
+
+            Route::post('/internal/cron', SchedulerCronController::class)
+                ->middleware(VerifyCronSecret::class)
+                ->name('internal.cron');
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
