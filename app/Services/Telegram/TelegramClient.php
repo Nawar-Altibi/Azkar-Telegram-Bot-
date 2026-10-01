@@ -9,6 +9,16 @@ use RuntimeException;
 
 class TelegramClient
 {
+    /**
+     * Connection errors embed the request URL, which contains the bot token.
+     */
+    public static function redact(string $message): string
+    {
+        $token = (string) config('telegram.bot_token');
+
+        return $token === '' ? $message : str_replace($token, '[redacted]', $message);
+    }
+
     public function sendMessage(int|string $chatId, string $text, array $replyMarkup = [], array $extra = []): array
     {
         $payload = array_filter([

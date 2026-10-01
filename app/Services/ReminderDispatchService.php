@@ -8,6 +8,8 @@ use App\Enums\ReminderType;
 use App\Jobs\SendAdhkarReminderJob;
 use App\Models\ReminderLog;
 use App\Models\User;
+use App\Services\Telegram\TelegramClient;
+use DateTimeInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -22,28 +24,52 @@ class ReminderDispatchService
 
     public function claimDue(): int
     {
-        $claimed = 0;
+        return count($this->claimDueLogIds());
+    }
+
+    /**
+     * Claims due reminders and dispatches their send jobs.
+     *
+     * @param  float|null  $deadline  hrtime seconds after which no new user is claimed; unclaimed users stay due for the next tick
+     * @return list<int> ids of the reminder logs claimed by this call
+     */
+    public function claimDueLogIds(?float $deadline = null): array
+    {
+        $claimed = [];
         $now = now();
 
         User::query()
+            ->select(['id', 'next_morning_at', 'next_evening_at'])
             ->where('reminders_enabled', true)
             ->where(function ($query) use ($now) {
                 $query->where('next_morning_at', '<=', $now)
                     ->orWhere('next_evening_at', '<=', $now);
             })
             ->orderBy('id')
-            ->chunkById((int) config('adhkar.chunk_size', 100), function ($users) use ($now, &$claimed) {
-                foreach ($users as $user) {
-                    if ($user->next_morning_at && $user->next_morning_at->lte($now)) {
-                        if ($this->claimOne($user->fresh(), ReminderType::Morning)) {
-                            $claimed++;
+            ->chunkById((int) config('adhkar.chunk_size', 100), function ($users) use ($now, $deadline, &$claimed) {
+                foreach ($users as $candidate) {
+                    if ($deadline !== null && hrtime(true) / 1e9 >= $deadline) {
+                        return false;
+                    }
+
+                    $morningDue = $candidate->next_morning_at && $candidate->next_morning_at->lte($now);
+
+                    // The chunk row may be stale by the time it is processed; claim from the current row.
+                    $user = $candidate->fresh();
+
+                    if ($morningDue && $this->isStillDue($user, ReminderType::Morning, $now)) {
+                        $logId = $this->claim($user, ReminderType::Morning);
+                        if ($logId !== null) {
+                            $claimed[] = $logId;
+                            // The sync send may have disabled a blocked user; never save over that state.
+                            $user = $user->fresh();
                         }
                     }
 
-                    $user = $user->fresh();
-                    if ($user && $user->next_evening_at && $user->next_evening_at->lte($now)) {
-                        if ($this->claimOne($user, ReminderType::Evening)) {
-                            $claimed++;
+                    if ($this->isStillDue($user, ReminderType::Evening, $now)) {
+                        $logId = $this->claim($user, ReminderType::Evening);
+                        if ($logId !== null) {
+                            $claimed[] = $logId;
                         }
                     }
                 }
@@ -54,15 +80,31 @@ class ReminderDispatchService
 
     public function claimOne(User $user, ReminderType $type): bool
     {
+        return $this->claim($user, $type) !== null;
+    }
+
+    private function isStillDue(?User $user, ReminderType $type, DateTimeInterface $now): bool
+    {
+        if ($user === null || ! $user->reminders_enabled) {
+            return false;
+        }
+
+        $dueAt = $type === ReminderType::Morning ? $user->next_morning_at : $user->next_evening_at;
+
+        return $dueAt !== null && $dueAt->lte($now);
+    }
+
+    private function claim(User $user, ReminderType $type): ?int
+    {
         $dueAt = $type === ReminderType::Morning ? $user->next_morning_at : $user->next_evening_at;
         if ($dueAt === null || ! $user->timezone) {
-            return false;
+            return null;
         }
 
         $localDate = $dueAt->copy()->timezone($user->timezone)->toDateString();
         $localTime = $type === ReminderType::Morning ? $user->morning_time : $user->evening_time;
         if (! $localTime) {
-            return false;
+            return null;
         }
 
         try {
@@ -92,10 +134,10 @@ class ReminderDispatchService
                 return $log;
             });
         } catch (UniqueConstraintViolationException) {
-            return false;
+            return null;
         } catch (QueryException $exception) {
             if ($this->isUniqueViolation($exception)) {
-                return false;
+                return null;
             }
 
             throw $exception;
@@ -103,7 +145,7 @@ class ReminderDispatchService
 
         $this->dispatchJob($log->id);
 
-        return true;
+        return $log->id;
     }
 
     public function recoverStalePending(): int
@@ -160,7 +202,7 @@ class ReminderDispatchService
         } catch (Throwable $exception) {
             Log::channel('telegram')->error('Failed to dispatch reminder job', [
                 'reminder_log_id' => $logId,
-                'error' => $exception->getMessage(),
+                'error' => TelegramClient::redact($exception->getMessage()),
             ]);
         }
     }

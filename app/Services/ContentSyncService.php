@@ -4,10 +4,55 @@ namespace App\Services;
 
 use App\Models\AdhkarCollection;
 use App\Models\AdhkarItem;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ContentSyncService
 {
+    public const MARKER_KEY = 'adhkar:content_sync_hash';
+
+    public const LOCK_KEY = 'adhkar:content-sync';
+
+    private const LOCK_SECONDS = 300;
+
+    protected int $lockWaitSeconds = 120;
+
+    /**
+     * Startup path: skips only when the source hash matches the last successful sync
+     * AND the database actually holds the expected content.
+     *
+     * @return array{created:int,updated:int,unchanged:int,deactivated:int}|null null when skipped
+     */
+    public function syncIfChanged(): ?array
+    {
+        $hash = $this->sourceHash();
+        if ($this->isCurrent($hash)) {
+            return null;
+        }
+
+        return Cache::lock(self::LOCK_KEY, self::LOCK_SECONDS)->block($this->lockWaitSeconds, function () use ($hash) {
+            // Another instance may have finished the sync while this one waited.
+            if ($this->isCurrent($hash)) {
+                return null;
+            }
+
+            return $this->syncAndMark($hash);
+        });
+    }
+
+    /**
+     * Forced sync, serialized with concurrent startups.
+     *
+     * @return array{created:int,updated:int,unchanged:int,deactivated:int}
+     */
+    public function syncLocked(): array
+    {
+        return Cache::lock(self::LOCK_KEY, self::LOCK_SECONDS)->block(
+            $this->lockWaitSeconds,
+            fn () => $this->syncAndMark($this->sourceHash()),
+        );
+    }
+
     /**
      * @return array{created:int,updated:int,unchanged:int,deactivated:int}
      */
@@ -18,8 +63,7 @@ class ContentSyncService
         DB::transaction(function () use (&$stats) {
             $this->syncCollections();
 
-            foreach (['morning', 'evening', 'additional'] as $file) {
-                $path = database_path("data/adhkar/{$file}.php");
+            foreach ($this->dataFiles() as $path) {
                 $items = require $path;
 
                 foreach ($items as $data) {
@@ -31,17 +75,111 @@ class ContentSyncService
         return $stats;
     }
 
-    private function syncCollections(): void
+    public function sourceHash(): string
     {
-        $collections = [
+        $context = hash_init('sha256');
+        foreach ($this->sourceFiles() as $path) {
+            hash_update($context, basename($path)."\0");
+            hash_update_file($context, $path);
+        }
+
+        return hash_final($context);
+    }
+
+    /**
+     * The database is the source of truth: an empty, partial, or hand-edited content set is never "complete".
+     */
+    public function isComplete(): bool
+    {
+        $collectionKeys = array_column($this->collectionDefinitions(), 'key');
+        if (AdhkarCollection::query()->whereIn('key', $collectionKeys)->where('active', true)->count() !== count($collectionKeys)) {
+            return false;
+        }
+
+        $itemKeys = [];
+        $activeKeys = [];
+        $links = 0;
+        foreach ($this->dataFiles() as $path) {
+            foreach (require $path as $data) {
+                $itemKeys[] = $data['key'];
+                if ($data['active'] ?? true) {
+                    $activeKeys[] = $data['key'];
+                }
+                $links += count($data['collections'] ?? []);
+            }
+        }
+
+        if (AdhkarItem::query()->whereIn('key', $itemKeys)->count() !== count($itemKeys)) {
+            return false;
+        }
+
+        if (AdhkarItem::query()->whereIn('key', $activeKeys)->where('active', true)->count() !== count($activeKeys)) {
+            return false;
+        }
+
+        $storedLinks = DB::table('adhkar_collection_items')
+            ->join('adhkar_items', 'adhkar_items.id', '=', 'adhkar_collection_items.item_id')
+            ->whereIn('adhkar_items.key', $itemKeys)
+            ->count();
+
+        return $storedLinks === $links;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dataFiles(): array
+    {
+        return array_map(
+            fn (string $file) => database_path("data/adhkar/{$file}.php"),
+            ['morning', 'evening', 'additional'],
+        );
+    }
+
+    /**
+     * Everything that determines the synced result: the content files and this sync logic.
+     *
+     * @return list<string>
+     */
+    protected function sourceFiles(): array
+    {
+        return [...$this->dataFiles(), __FILE__];
+    }
+
+    private function isCurrent(string $hash): bool
+    {
+        return Cache::get(self::MARKER_KEY) === $hash && $this->isComplete();
+    }
+
+    /**
+     * @return array{created:int,updated:int,unchanged:int,deactivated:int}
+     */
+    private function syncAndMark(string $hash): array
+    {
+        $stats = $this->sync();
+        // Written only after the sync transaction committed; an interrupted sync leaves no marker.
+        Cache::forever(self::MARKER_KEY, $hash);
+
+        return $stats;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function collectionDefinitions(): array
+    {
+        return [
             ['key' => 'morning_short', 'category' => 'morning', 'variant' => 'short', 'title' => 'أذكار الصباح — المختصر', 'order' => 1],
             ['key' => 'morning_full', 'category' => 'morning', 'variant' => 'full', 'title' => 'أذكار الصباح — الكامل', 'order' => 2],
             ['key' => 'evening_short', 'category' => 'evening', 'variant' => 'short', 'title' => 'أذكار المساء — المختصر', 'order' => 3],
             ['key' => 'evening_full', 'category' => 'evening', 'variant' => 'full', 'title' => 'أذكار المساء — الكامل', 'order' => 4],
             ['key' => 'additional', 'category' => 'additional', 'variant' => null, 'title' => 'أذكار وفضائل إضافية', 'order' => 5],
         ];
+    }
 
-        foreach ($collections as $collection) {
+    private function syncCollections(): void
+    {
+        foreach ($this->collectionDefinitions() as $collection) {
             AdhkarCollection::query()->updateOrCreate(
                 ['key' => $collection['key']],
                 $collection + ['active' => true],

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -eu
 
 cd /var/www/html
@@ -77,7 +77,7 @@ wait_for_database() {
 
 if [ -n "${VERCEL:-}" ]; then
     # One container serves webhooks and has no always-on worker.
-    # cron-job.org calls /internal/cron every minute, which runs the scheduler.
+    # cron-job.org calls /internal/cron every minute, which runs the reminder tick in-process.
     export QUEUE_CONNECTION=sync
     export LOG_CHANNEL=stderr
 fi
@@ -86,13 +86,11 @@ prepare_app() {
     require_production_database
     wait_for_database
     php artisan migrate --force --no-interaction
-    php artisan adhkar:sync --no-interaction
-    php artisan adhkar:db-status --no-interaction
+    # Full sync only when content/sync logic changed or the database lacks the expected content.
+    php artisan adhkar:sync --if-changed --no-interaction
 
     if [ "${APP_ENV:-local}" = "production" ]; then
-        php artisan config:cache --no-interaction
-        php artisan route:cache --no-interaction
-        php artisan view:cache --no-interaction
+        php artisan optimize --no-interaction
     fi
 
     # migrate creates the sqlite file as root; php-fpm runs as www-data.
@@ -103,21 +101,29 @@ prepare_app() {
 case "$role" in
     web)
         prepare_app
-        php-fpm --daemonize
+        php-fpm --nodaemonize &
+        fpm_pid=$!
         nginx -g "daemon off;" &
         nginx_pid=$!
 
-        trap 'kill "$nginx_pid" 2>/dev/null || true; pkill php-fpm || true; exit 0' TERM INT
+        stop_children() {
+            kill -"$1" "$nginx_pid" "$fpm_pid" 2>/dev/null || true
+            wait "$nginx_pid" "$fpm_pid" 2>/dev/null || true
+        }
 
-        while kill -0 "$nginx_pid" 2>/dev/null; do
-            if ! pgrep -x php-fpm >/dev/null; then
-                echo "php-fpm exited." >&2
-                exit 1
-            fi
-            sleep 2
-        done
+        # The php-fpm base image sets STOPSIGNAL SIGQUIT: both servers treat QUIT as a graceful stop.
+        trap 'stop_children QUIT; exit 0' QUIT
+        trap 'stop_children TERM; exit 0' TERM INT
 
-        echo "nginx exited." >&2
+        # Blocks without polling until either server exits; a trapped signal interrupts it.
+        wait -n "$fpm_pid" "$nginx_pid" || true
+
+        if kill -0 "$fpm_pid" 2>/dev/null; then
+            echo "nginx exited." >&2
+        else
+            echo "php-fpm exited." >&2
+        fi
+        stop_children TERM
         exit 1
         ;;
     queue)

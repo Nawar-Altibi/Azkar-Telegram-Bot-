@@ -22,8 +22,13 @@ integration value is used as-is. Never copy the connection string into Git, Mark
    unless `DB_CONNECTION=pgsql` and `DB_URL` or `DATABASE_URL` is set. Production never falls back to SQLite.
 2. `adhkar:db-status --wait=60`: waits for PostgreSQL and logs one safe line:
    `Database driver: pgsql, database: neondb, host: *.neon.tech`.
-3. `migrate --force`, then `adhkar:sync` (idempotent), then `adhkar:db-status` again.
-4. `config:cache`, `route:cache`, `view:cache`.
+3. `migrate --force`, then `adhkar:sync --if-changed`. The full idempotent sync runs only when the
+   content files or `ContentSyncService` changed since the last successful sync, or when the database
+   does not hold the complete expected content (empty, partial, or interrupted). The marker lives in the
+   shared database cache and is written only after the sync commits. Run `php artisan adhkar:sync` to force it.
+4. `optimize` (config, event, route and view caches in one process).
+5. `php-fpm` and `nginx` start as children of the entrypoint, which blocks on `wait -n` and exits 1 if
+   either one exits, so the platform restarts the container.
 
 ## Neon pooler (PgBouncer) requirement
 

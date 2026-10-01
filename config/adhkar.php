@@ -16,6 +16,12 @@ return [
     'update_stale_minutes' => (int) env('ADHKAR_UPDATE_STALE_MINUTES', 5),
     'update_max_attempts' => (int) env('ADHKAR_UPDATE_MAX_ATTEMPTS', 5),
     'chunk_size' => 100,
+    /*
+     * Seconds after which a cron tick stops claiming new users; the rest stay due for the next tick.
+     * Keeps a tick (budget + one Telegram timeout) inside cron-job.org's and nginx's request timeouts.
+     */
+    'cron_claim_budget_seconds' => (int) env('ADHKAR_CRON_CLAIM_BUDGET_SECONDS', 25),
+    'cron_count_queries' => (bool) env('ADHKAR_CRON_COUNT_QUERIES', true),
     'inter_message_delay_microseconds' => 50_000,
 
     'timezones' => [

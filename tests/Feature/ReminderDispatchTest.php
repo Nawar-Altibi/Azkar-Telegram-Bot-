@@ -8,8 +8,13 @@ use App\Enums\ReminderType;
 use App\Jobs\SendAdhkarReminderJob;
 use App\Models\ReminderLog;
 use App\Models\User;
+use App\Services\ContentSyncService;
 use App\Services\ReminderDispatchService;
+use App\Services\StaleRecoveryService;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ReminderDispatchTest extends TestCase
@@ -131,5 +136,171 @@ class ReminderDispatchTest extends TestCase
 
         $this->artisan('adhkar:dispatch-due-reminders')->assertSuccessful();
         Bus::assertNotDispatched(SendAdhkarReminderJob::class);
+    }
+
+    public function test_dispatch_command_no_longer_runs_stale_recovery_every_minute(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $log = ReminderLog::factory()->create(['status' => ReminderLogStatus::Pending, 'dispatch_attempts' => 0]);
+        $log->forceFill(['created_at' => now()->subMinutes(10)])->save();
+
+        $this->artisan('adhkar:dispatch-due-reminders')->assertSuccessful();
+
+        $this->assertSame(0, $log->fresh()->dispatch_attempts);
+        Bus::assertNotDispatched(SendAdhkarReminderJob::class);
+    }
+
+    /**
+     * Mutates the row right after the due-user chunk reads it, like a concurrent webhook would.
+     */
+    private function afterChunkRead(User $user, callable $change): void
+    {
+        $done = false;
+        User::retrieved(function (User $retrieved) use ($user, $change, &$done) {
+            if (! $done && $retrieved->id === $user->id) {
+                $done = true;
+                $change();
+            }
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dueMorning(): array
+    {
+        return [
+            'reminders_enabled' => true,
+            'timezone' => 'UTC',
+            'morning_time' => '06:00:00',
+            'evening_time' => '18:00:00',
+            'next_morning_at' => now()->subMinute(),
+            'next_evening_at' => now()->addHours(6),
+        ];
+    }
+
+    public function test_time_moved_later_during_the_tick_is_not_claimed_early(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $user = User::factory()->create($this->dueMorning());
+        $moved = now()->addHours(3)->startOfSecond();
+        $this->afterChunkRead($user, fn () => DB::table('users')->where('id', $user->id)->update(['next_morning_at' => $moved]));
+
+        $this->assertSame(0, app(ReminderDispatchService::class)->claimDue());
+
+        $this->assertSame(0, ReminderLog::query()->count());
+        $this->assertTrue($user->fresh()->next_morning_at->equalTo($moved));
+        Bus::assertNotDispatched(SendAdhkarReminderJob::class);
+    }
+
+    public function test_reminders_disabled_during_the_tick_are_not_claimed(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $user = User::factory()->create($this->dueMorning());
+        $this->afterChunkRead($user, fn () => DB::table('users')->where('id', $user->id)->update(['reminders_enabled' => false]));
+
+        $this->assertSame(0, app(ReminderDispatchService::class)->claimDue());
+        $this->assertSame(0, ReminderLog::query()->count());
+    }
+
+    public function test_user_deleted_during_the_tick_is_skipped(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $user = User::factory()->create($this->dueMorning());
+        $other = User::factory()->create($this->dueMorning());
+        $this->afterChunkRead($user, fn () => DB::table('users')->where('id', $user->id)->delete());
+
+        $this->assertSame(1, app(ReminderDispatchService::class)->claimDue());
+        $this->assertSame([$other->id], ReminderLog::query()->pluck('user_id')->all());
+    }
+
+    public function test_both_slots_due_claims_both_with_correct_next_times(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-01 19:00:00'));
+        $user = User::factory()->create(array_merge($this->dueMorning(), [
+            'next_morning_at' => now()->subHours(13),
+            'next_evening_at' => now()->subHour(),
+        ]));
+
+        $ids = app(ReminderDispatchService::class)->claimDueLogIds();
+
+        $this->assertCount(2, $ids);
+        $user->refresh();
+        $this->assertSame('2026-10-02 06:00:00', $user->next_morning_at->toDateTimeString());
+        $this->assertSame('2026-10-02 18:00:00', $user->next_evening_at->toDateTimeString());
+        Bus::assertDispatchedTimes(SendAdhkarReminderJob::class, 2);
+    }
+
+    public function test_blocked_user_on_morning_is_not_claimed_for_evening(): void
+    {
+        config(['queue.default' => 'sync']);
+        app(ContentSyncService::class)->sync();
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Forbidden: bot was blocked by the user'], 403),
+        ]);
+        $user = User::factory()->create(array_merge($this->dueMorning(), [
+            'next_evening_at' => now()->subMinute(),
+        ]));
+
+        app(ReminderDispatchService::class)->claimDue();
+
+        Http::assertSentCount(1);
+        $this->assertSame(1, ReminderLog::query()->count());
+        $user->refresh();
+        $this->assertFalse($user->reminders_enabled);
+        $this->assertNull($user->next_morning_at);
+        $this->assertNull($user->next_evening_at);
+        $this->assertSame('blocked_by_user', ReminderLog::query()->sole()->error_message);
+    }
+
+    public function test_concurrent_claim_from_a_stale_instance_hits_the_unique_constraint(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $user = User::factory()->create($this->dueMorning());
+        $staleCopy = $user->fresh();
+
+        $this->assertSame(1, app(ReminderDispatchService::class)->claimDue());
+        $advanced = $user->fresh()->next_morning_at;
+
+        // A second tick that loaded the row before the first committed.
+        $this->assertFalse(app(ReminderDispatchService::class)->claimOne($staleCopy, ReminderType::Morning));
+        $this->assertSame(1, ReminderLog::query()->count());
+        $this->assertTrue($advanced->equalTo($user->fresh()->next_morning_at));
+        Bus::assertDispatchedTimes(SendAdhkarReminderJob::class, 1);
+    }
+
+    public function test_stale_recovery_service_skips_inside_the_interval_and_under_a_held_lock(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $recovery = app(StaleRecoveryService::class);
+
+        $this->assertNotNull($recovery->runIfDue());
+        $this->assertNull($recovery->runIfDue());
+
+        $this->travel(6)->minutes();
+        $other = Cache::lock(StaleRecoveryService::LOCK_KEY, StaleRecoveryService::LOCK_SECONDS);
+        $this->assertTrue($other->get());
+        $this->assertNull($recovery->runIfDue());
+
+        $other->release();
+        $this->assertNotNull($recovery->runIfDue());
+    }
+
+    public function test_stale_recovery_failure_leaves_the_marker_for_the_next_tick(): void
+    {
+        $this->mock(ReminderDispatchService::class)
+            ->shouldReceive('recoverStalePending')
+            ->once()
+            ->andThrow(new \RuntimeException('db down'));
+
+        try {
+            app(StaleRecoveryService::class)->runIfDue();
+            $this->fail('Expected the failure to propagate.');
+        } catch (\RuntimeException) {
+        }
+
+        $this->assertNull(Cache::get(StaleRecoveryService::MARKER_KEY));
+        $this->assertTrue(Cache::lock(StaleRecoveryService::LOCK_KEY, 1)->get());
     }
 }

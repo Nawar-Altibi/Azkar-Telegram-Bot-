@@ -14,11 +14,11 @@ class DispatchDueRemindersCommand extends Command
 
     public function handle(ReminderDispatchService $dispatcher): int
     {
+        // Stale recovery runs separately via adhkar:recover-stale (every five minutes).
         $claimed = $dispatcher->claimDue();
-        $recovered = $dispatcher->recoverStalePending();
         Cache::put('adhkar:last_scheduler_tick', now()->toIso8601String(), now()->addHour());
 
-        $this->info("Claimed {$claimed} reminder(s); recovered {$recovered} stale pending log(s).");
+        $this->info("Claimed {$claimed} reminder(s).");
 
         return self::SUCCESS;
     }
