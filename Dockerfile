@@ -11,6 +11,7 @@ RUN composer install \
         --prefer-dist \
         --optimize-autoloader \
         --no-scripts \
+        --ignore-platform-req=ext-gd \
     && rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php \
     && php -r "file_exists('.env') || copy('.env.example', '.env');" \
     && php artisan key:generate --force --ansi \
@@ -22,12 +23,19 @@ FROM php:8.3-fpm-bookworm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
+        libfreetype6 \
+        libfreetype6-dev \
+        libjpeg62-turbo \
+        libjpeg62-turbo-dev \
+        libpng16-16 \
+        libpng-dev \
         libpq5 \
         libpq-dev \
         nginx \
         procps \
-    && docker-php-ext-install pdo_mysql pdo_pgsql bcmath opcache \
-    && apt-get purge -y --auto-remove libpq-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql pdo_pgsql bcmath opcache gd \
+    && apt-get purge -y --auto-remove libpq-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 

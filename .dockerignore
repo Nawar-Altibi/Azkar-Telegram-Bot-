@@ -14,6 +14,8 @@ storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
+storage/app/pdf
+storage/app/mpdf
 .phpunit.cache
 bootstrap/cache/packages.php
 bootstrap/cache/services.php
