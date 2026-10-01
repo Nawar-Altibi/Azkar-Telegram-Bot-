@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
 use App\Models\User;
 use App\Support\Telegram\KeyboardFactory;
@@ -129,22 +128,18 @@ class OnboardingService
     public function handleEveningTime(User $user, string $time): array
     {
         $user->evening_time = ReminderScheduleCalculator::normalizeTime($time);
-        $user->onboarding_state = OnboardingState::WaitingMode;
-        $user->awaiting_input = null;
-        $user->save();
 
-        return [
-            'text' => __('bot.ask_mode'),
-            'reply_markup' => $this->keyboards->modeOptions(),
-        ];
+        return $this->finish($user);
     }
 
     /**
+     * Users who stopped at the old mode step, or press its buttons, finish setup directly.
+     *
      * @return array{text:string,reply_markup:?array}
      */
-    public function handleMode(User $user, AdhkarMode $mode): array
+    public function finish(User $user): array
     {
-        $this->settings->completeOnboarding($user, $mode);
+        $this->settings->completeOnboarding($user);
 
         return [
             'text' => __('bot.onboarding_complete', ['summary' => $this->summary($user->fresh())]),
@@ -210,7 +205,6 @@ class OnboardingService
 
     public function summary(User $user): string
     {
-        $mode = $user->mode === AdhkarMode::Full ? __('bot.mode_full') : __('bot.mode_short');
         $reminders = $user->reminders_enabled ? __('bot.reminders_on') : __('bot.reminders_off');
         $region = $user->timezone_label
             ?: TimezoneCatalog::labelForTimezone($user->timezone)
@@ -220,7 +214,6 @@ class OnboardingService
             __('bot.summary_timezone', ['timezone' => $region]),
             __('bot.summary_morning', ['time' => $user->formattedMorningTime() ?: '—']),
             __('bot.summary_evening', ['time' => $user->formattedEveningTime() ?: '—']),
-            __('bot.summary_mode', ['mode' => $mode]),
             __('bot.summary_reminders', ['status' => $reminders]),
         ]);
     }
@@ -257,10 +250,7 @@ class OnboardingService
         return match ($user->onboarding_state) {
             OnboardingState::WaitingMorningTime => $this->morningScreen(),
             OnboardingState::WaitingEveningTime => $this->eveningScreen(),
-            OnboardingState::WaitingMode => [
-                'text' => __('bot.ask_mode'),
-                'reply_markup' => $this->keyboards->modeOptions(),
-            ],
+            OnboardingState::WaitingMode => $this->finish($user),
             OnboardingState::Completed => $this->settingsScreen($user),
             default => $this->timezoneScreen(),
         };

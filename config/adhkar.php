@@ -81,7 +81,7 @@ return [
         [
             'key' => 'salawat',
             'label' => 'الصلاة على النبي',
-            'items' => ['additional.09', 'additional.10'],
+            'items' => ['additional.11', 'additional.09', 'additional.10'],
         ],
     ],
 

@@ -50,10 +50,10 @@ class ReminderDeliveryAndVersioningTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($text, 'حان وقت أذكار الصباح')
-                && str_contains($text, 'وردك المختصر يستغرق تقريبًا 5 دقائق.')
-                && str_contains($markup, 'ابدأ القراءة')
+                && str_contains($text, 'تقريبًا 5 دقائق')
                 && str_contains($markup, 'تعديل الوقت')
-                && str_contains($markup, 'reminder:start:'.$log->id);
+                && str_contains($markup, 'reminder:start:'.$log->id.':s')
+                && str_contains($markup, 'reminder:start:'.$log->id.':a');
         });
 
         app(\App\Services\Telegram\TelegramUpdateProcessor::class)->handle(

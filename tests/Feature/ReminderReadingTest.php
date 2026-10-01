@@ -192,6 +192,7 @@ class ReminderReadingTest extends TestCase
             'https://api.telegram.org/*' => Http::sequence()
                 ->push(['ok' => true, 'result' => ['message_id' => 1]])
                 ->push(['ok' => false, 'description' => 'Bad Request: secret-api-error'], 400)
+                ->push(['ok' => false, 'description' => 'Bad Request: secret-api-error'], 400)
                 ->push(['ok' => true, 'result' => ['message_id' => 4]]),
         ]);
         $user = $this->user();
@@ -256,8 +257,24 @@ class ReminderReadingTest extends TestCase
         app(TelegramUpdateProcessor::class)->handle(
             $this->telegramCallbackPayload('today:morning', 60, 1001)
         );
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains($request->url(), 'editMessageText')
+                && str_contains((string) ($request['text'] ?? ''), 'أي ورد تريد قراءته الآن')
+                && str_contains($markup, 'rt:m:s:0')
+                && str_contains($markup, 'rt:m:a:0');
+        });
+
+        app(TelegramUpdateProcessor::class)->handle(
+            $this->telegramCallbackPayload('rt:m:a:0', 61, 1001)
+        );
 
         $this->assertSame($before, ReminderLog::query()->count());
+        $this->assertSame(AdhkarMode::Short, $user->fresh()->mode);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && str_contains((string) ($request['text'] ?? ''), 'كامل')
+            && str_contains((string) ($request['text'] ?? ''), 'الذكر 1 من'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'reminder:done:'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'reminder:done:'));
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الذكر 1 من'));
@@ -279,7 +296,7 @@ class ReminderReadingTest extends TestCase
         Http::assertSent(function ($request) use ($log) {
             $markup = (string) ($request['reply_markup'] ?? '');
 
-            return str_contains($request->url(), 'sendMessage')
+            return str_contains($request->url(), 'editMessageText')
                 && str_contains($markup, 'rd:'.$log->id.':s:1')
                 && str_contains($markup, 'أرسل الورد كاملًا')
                 && ! str_contains($markup, 'احفظ الورد')
@@ -321,12 +338,9 @@ class ReminderReadingTest extends TestCase
             $this->telegramCallbackPayload('sv:l:'.$log->id.':s', 84, 1001)
         );
         $this->assertSame(AdhkarMode::Short, $user->fresh()->mode);
-        Http::assertSent(function ($request) {
-            return str_contains($request->url(), 'sendMessage')
-                && str_contains((string) ($request['text'] ?? ''), 'حتى لو انقطع الاتصال')
-                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'inline_keyboard');
-        });
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'سيد الاستغفار'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument')
+            && str_contains($this->multipartField($request, 'caption'), 'أذكار الصباح — مختصر')
+            && str_starts_with($this->multipartField($request, 'document'), '%PDF'));
         Http::assertSent(function ($request) use ($log, $last) {
             $markup = (string) ($request['reply_markup'] ?? '');
 
@@ -366,6 +380,58 @@ class ReminderReadingTest extends TestCase
             return is_array($markup)
                 && str_contains(json_encode($markup, JSON_UNESCAPED_UNICODE), '▶️ تفعيل التذكير');
         });
+    }
+
+    public function test_choosing_full_from_the_reminder_reads_the_full_wird_in_the_same_message(): void
+    {
+        $user = $this->user();
+        $log = $this->sentLog($user, 'morning_short');
+
+        app(TelegramUpdateProcessor::class)->handle(
+            $this->telegramCallbackPayload('reminder:start:'.$log->id.':a', 90, 1001)
+        );
+
+        $log->refresh();
+        $this->assertSame('morning_full', $log->collection_key);
+        $this->assertNotNull($log->reading_started_at);
+        $this->assertContains('morning.10', array_column($log->content_version_map, 'key'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && (int) ($request['message_id'] ?? 0) === 10
+            && str_contains((string) ($request['text'] ?? ''), 'كامل')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'rd:'.$log->id.':a:1'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
+    }
+
+    public function test_pdf_is_uploaded_once_then_resent_by_file_id(): void
+    {
+        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 9, 'document' => ['file_id' => 'FILE-123']],
+            ]),
+        ]);
+        $this->user();
+
+        app(TelegramUpdateProcessor::class)->handle($this->telegramCallbackPayload('sv:t:e:a', 95, 1001));
+        app(TelegramUpdateProcessor::class)->handle($this->telegramCallbackPayload('sv:t:e:a', 96, 1001));
+
+        $documents = collect(Http::recorded())->filter(fn ($pair) => str_contains($pair[0]->url(), 'sendDocument'))->values();
+        $this->assertCount(2, $documents);
+        $this->assertStringContainsString('أذكار المساء — كامل', $this->multipartField($documents[0][0], 'caption'));
+        $this->assertSame('FILE-123', $documents[1][0]['document'] ?? null);
+    }
+
+    private function multipartField(\Illuminate\Http\Client\Request $request, string $name): string
+    {
+        foreach ($request->data() as $part) {
+            if (is_array($part) && ($part['name'] ?? null) === $name) {
+                return (string) ($part['contents'] ?? '');
+            }
+        }
+
+        return '';
     }
 
     private function user(int $telegramId = 1001): User

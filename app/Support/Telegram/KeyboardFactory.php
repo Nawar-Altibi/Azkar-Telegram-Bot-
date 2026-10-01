@@ -98,22 +98,6 @@ class KeyboardFactory
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    public function modeOptions(string $prefix = 'onb'): array
-    {
-        return [
-            'inline_keyboard' => [
-                $this->rtl([
-                    ['text' => 'مختصر', 'callback_data' => $prefix.':mode:short'],
-                    ['text' => 'كامل', 'callback_data' => $prefix.':mode:full'],
-                ]),
-                $this->backOnlyRow(),
-            ],
-        ];
-    }
-
-    /**
      * @param  array<int, array{label:string,hm:string}>  $options
      * @return array<string, mixed>
      */
@@ -180,7 +164,6 @@ class KeyboardFactory
                     ['text' => '🌅 وقت الصباح', 'callback_data' => 'settings:morning_time'],
                     ['text' => '🌙 وقت المساء', 'callback_data' => 'settings:evening_time'],
                 ]),
-                [['text' => '📖 نوع الورد', 'callback_data' => 'settings:mode']],
                 [['text' => $reminderLabel, 'callback_data' => 'settings:toggle_reminders']],
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],
             ],
@@ -199,6 +182,36 @@ class KeyboardFactory
                 [['text' => '🌟 أذكار إضافية', 'callback_data' => 'add:list']],
             ],
         ];
+    }
+
+    /**
+     * @param  string  $period  m or e
+     * @return array<string, mixed>
+     */
+    public function modeChoice(string $period): array
+    {
+        return [
+            'inline_keyboard' => [
+                $this->rtl([
+                    ['text' => '🌿 مختصر', 'callback_data' => "rt:{$period}:s:0"],
+                    ['text' => '📖 كامل', 'callback_data' => "rt:{$period}:a:0"],
+                ]),
+                [['text' => '🔙 رجوع', 'callback_data' => 'today:menu']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function timezoneRetry(bool $fromSettings): array
+    {
+        $rows = [[['text' => __('bot.timezone_pick_from_list'), 'callback_data' => 'nav:back']]];
+        if ($fromSettings) {
+            $rows[] = [['text' => '❌ إلغاء', 'callback_data' => 'nav:cancel']];
+        }
+
+        return ['inline_keyboard' => $rows];
     }
 
     /**
@@ -223,13 +236,13 @@ class KeyboardFactory
      * @param  iterable<int, array{id:int,title:string}>  $items
      * @return array<string, mixed>
      */
-    public function additionalList(iterable $items): array
+    public function additionalList(iterable $items, string $groupKey): array
     {
         $rows = [];
         foreach ($items as $item) {
             $rows[] = [[
                 'text' => $item['title'],
-                'callback_data' => 'add:item:'.$item['id'],
+                'callback_data' => 'add:item:'.$item['id'].':'.$groupKey,
             ]];
         }
         $rows[] = [['text' => '🔙 رجوع', 'callback_data' => 'add:list']];
@@ -240,11 +253,13 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function additionalItem(): array
+    public function additionalItem(?string $groupKey = null): array
     {
+        $back = $groupKey !== null && $groupKey !== '' ? 'add:group:'.$groupKey : 'add:list';
+
         return [
             'inline_keyboard' => [[
-                ['text' => '🔙 رجوع', 'callback_data' => 'add:list'],
+                ['text' => '🔙 رجوع', 'callback_data' => $back],
             ]],
         ];
     }
@@ -270,7 +285,10 @@ class KeyboardFactory
 
         return [
             'inline_keyboard' => [
-                [['text' => '📖 ابدأ القراءة', 'callback_data' => 'reminder:start:'.$reminderLogId]],
+                $this->rtl([
+                    ['text' => '🌿 مختصر', 'callback_data' => 'reminder:start:'.$reminderLogId.':s'],
+                    ['text' => '📖 كامل', 'callback_data' => 'reminder:start:'.$reminderLogId.':a'],
+                ]),
                 [['text' => '⚙️ تعديل الوقت', 'callback_data' => $timeCallback]],
             ],
         ];

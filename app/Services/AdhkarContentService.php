@@ -92,11 +92,38 @@ class AdhkarContentService
     public function nudgeText(string $collectionKey): string
     {
         $evening = str_starts_with($collectionKey, 'evening');
-        $full = str_contains($collectionKey, '_full');
 
         return __($evening ? 'bot.nudge_evening' : 'bot.nudge_morning', [
-            'duration' => __($full ? 'bot.nudge_duration_full' : 'bot.nudge_duration_short'),
+            'short' => __('bot.duration_short'),
+            'full' => __('bot.duration_full'),
         ]);
+    }
+
+    public function modeChoiceText(ReminderType $type): string
+    {
+        return __('bot.choose_mode', [
+            'title' => $type === ReminderType::Evening ? '🌙 أذكار المساء' : '🌅 أذكار الصباح',
+            'short' => __('bot.duration_short'),
+            'full' => __('bot.duration_full'),
+        ]);
+    }
+
+    /**
+     * Title for a wird file or caption, e.g. "أذكار الصباح — مختصر".
+     */
+    public function wirdTitle(string $collectionKey, bool $fullOnly = false): string
+    {
+        $title = str_starts_with($collectionKey, 'evening') ? 'أذكار المساء' : 'أذكار الصباح';
+        if ($fullOnly) {
+            return $title.' — تتمة الورد الكامل';
+        }
+
+        return $title.' — '.(str_contains($collectionKey, '_full') ? __('bot.mode_full') : __('bot.mode_short'));
+    }
+
+    public function footerText(string $collectionKey): string
+    {
+        return $this->footerForKey($collectionKey);
     }
 
     /**

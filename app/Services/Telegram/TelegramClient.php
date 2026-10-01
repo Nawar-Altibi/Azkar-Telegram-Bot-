@@ -31,6 +31,33 @@ class TelegramClient
         return $this->call('sendMessage', $payload);
     }
 
+    /**
+     * Uploads $path, or resends an earlier upload when $fileId is given.
+     */
+    public function sendDocument(
+        int|string $chatId,
+        string $path,
+        string $filename,
+        string $caption = '',
+        ?string $fileId = null,
+    ): array {
+        $payload = array_filter([
+            'chat_id' => $chatId,
+            'caption' => $caption !== '' ? $caption : null,
+            'parse_mode' => $caption !== '' ? 'HTML' : null,
+        ]);
+
+        if ($fileId !== null) {
+            return $this->call('sendDocument', $payload + ['document' => $fileId]);
+        }
+
+        return $this->call('sendDocument', $payload, null, [
+            'name' => 'document',
+            'contents' => (string) file_get_contents($path),
+            'filename' => $filename,
+        ]);
+    }
+
     public function sendChatAction(int|string $chatId, string $action = 'typing'): array
     {
         return $this->call('sendChatAction', [
@@ -105,9 +132,10 @@ class TelegramClient
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array{name:string,contents:string,filename:string}|null  $attachment  sent as multipart instead of a form
      * @return array<string, mixed>
      */
-    private function call(string $method, array $payload, ?int $timeoutSeconds = null): array
+    private function call(string $method, array $payload, ?int $timeoutSeconds = null, ?array $attachment = null): array
     {
         $token = (string) config('telegram.bot_token');
         if ($token === '') {
@@ -116,11 +144,13 @@ class TelegramClient
 
         $url = rtrim((string) config('telegram.api_base'), '/').'/bot'.$token.'/'.$method;
 
+        $request = Http::timeout($timeoutSeconds ?? (int) config('telegram.timeout', 15))->acceptJson();
+        $request = $attachment === null
+            ? $request->asForm()
+            : $request->attach($attachment['name'], $attachment['contents'], $attachment['filename']);
+
         /** @var Response $response */
-        $response = Http::timeout($timeoutSeconds ?? (int) config('telegram.timeout', 15))
-            ->acceptJson()
-            ->asForm()
-            ->post($url, $payload);
+        $response = $request->post($url, $payload);
 
         $json = $response->json() ?? [];
 

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
 use App\Models\User;
 use App\Support\TimezoneCatalog;
@@ -37,14 +36,6 @@ class UserSettingsService
     {
         $user->evening_time = ReminderScheduleCalculator::normalizeTime($time);
         $this->recalculateNextReminders($user);
-        $user->save();
-
-        return $user;
-    }
-
-    public function updateMode(User $user, AdhkarMode $mode): User
-    {
-        $user->mode = $mode;
         $user->save();
 
         return $user;
@@ -108,9 +99,8 @@ class UserSettingsService
         );
     }
 
-    public function completeOnboarding(User $user, AdhkarMode $mode): User
+    public function completeOnboarding(User $user): User
     {
-        $user->mode = $mode;
         $user->onboarding_state = OnboardingState::Completed;
         $user->awaiting_input = null;
         $user->reminders_enabled = true;

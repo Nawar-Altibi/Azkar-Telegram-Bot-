@@ -20,7 +20,7 @@ class SettingsPauseResumeTest extends TestCase
         ]);
     }
 
-    public function test_settings_mode_and_pause_resume(): void
+    public function test_settings_have_no_mode_and_pause_resume(): void
     {
         $user = User::factory()->create([
             'telegram_id' => 1001,
@@ -29,8 +29,16 @@ class SettingsPauseResumeTest extends TestCase
         ]);
 
         $this->process($this->telegramMessagePayload('/settings', 10));
+        Http::assertSent(function ($request) {
+            return str_contains((string) ($request['text'] ?? ''), 'الإعدادات')
+                && ! str_contains((string) ($request['text'] ?? ''), 'الورد:')
+                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:mode');
+        });
+
         $this->process($this->telegramCallbackPayload('settings:mode:full', 11));
-        $this->assertSame(AdhkarMode::Full, $user->fresh()->mode);
+        $this->assertSame(AdhkarMode::Short, $user->fresh()->mode);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && str_contains((string) ($request['text'] ?? ''), 'الإعدادات'));
 
         $this->process($this->telegramMessagePayload('/pause', 12));
         $user->refresh();
@@ -62,6 +70,23 @@ class SettingsPauseResumeTest extends TestCase
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'today:morning');
         });
         Http::assertNotSent(fn ($request) => ($request['text'] ?? '') === 'تم');
+    }
+
+    public function test_settings_screens_edit_the_same_message(): void
+    {
+        User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+        ]);
+
+        $this->process($this->telegramCallbackPayload('settings:morning_time', 31));
+        $this->process($this->telegramCallbackPayload('onb:time:morning:0630', 32));
+
+        $this->assertSame(0, collect(Http::recorded())->filter(
+            fn ($pair) => str_contains($pair[0]->url(), 'sendMessage')
+        )->count());
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && str_contains((string) ($request['text'] ?? ''), 'تم حفظ وقت الصباح'));
     }
 
     public function test_pause_before_onboarding_points_to_start(): void

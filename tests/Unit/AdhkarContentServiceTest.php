@@ -76,16 +76,17 @@ class AdhkarContentServiceTest extends TestCase
         $this->assertNotSame($forward['content_snapshot_hash'], $different['content_snapshot_hash']);
     }
 
-    public function test_nudge_includes_an_approximate_duration_and_the_card_does_not(): void
+    public function test_nudge_offers_both_durations_and_the_card_does_not(): void
     {
         $service = app(AdhkarContentService::class);
         $nudge = $service->nudgeText('morning_short');
-        $this->assertStringContainsString('وردك المختصر يستغرق تقريبًا 5 دقائق.', $nudge);
-        $this->assertStringNotContainsString('10–15', $nudge);
+        $this->assertStringContainsString('حان وقت أذكار الصباح', $nudge);
+        $this->assertStringContainsString('مختصر: تقريبًا 5 دقائق', $nudge);
+        $this->assertStringContainsString('كامل: تقريبًا 10–15 دقيقة', $nudge);
 
-        $full = $service->nudgeText('evening_full');
-        $this->assertStringContainsString('حان وقت أذكار المساء', $full);
-        $this->assertStringContainsString('الورد الكامل يستغرق تقريبًا 10–15 دقيقة.', $full);
+        $evening = $service->nudgeText('evening_full');
+        $this->assertStringContainsString('حان وقت أذكار المساء', $evening);
+        $this->assertStringContainsString('مختصر: تقريبًا 5 دقائق', $evening);
 
         $item = new AdhkarItem([
             'title' => 'آية الكرسي',
