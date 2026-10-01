@@ -210,10 +210,14 @@ class TelegramUpdateProcessor
 
         $resolved = $this->onboarding->resolveTimezoneInput($text);
         if ($resolved === null) {
-            $key = preg_match('/\d/u', ReminderScheduleCalculator::toAsciiDigits($text)) === 1
-                ? 'bot.timezone_digits'
-                : 'bot.timezone_unknown';
-            $this->reply($user, __($key, ['input' => $this->quote($text)]), $this->keyboards->timezoneRetry($fromSettings));
+            $digits = preg_match('/\d/u', ReminderScheduleCalculator::toAsciiDigits($text)) === 1;
+            $this->reply(
+                $user,
+                __($digits ? 'bot.timezone_digits' : 'bot.timezone_unknown', [
+                    'input' => $digits ? $this->quoteLtr($text) : $this->quote($text),
+                ]),
+                $this->keyboards->timezoneRetry($fromSettings),
+            );
 
             return;
         }
@@ -267,7 +271,7 @@ class TelegramUpdateProcessor
     private function replyTimeError(User $user, string $text, string $kind, bool $fromSettings, InvalidTimeException $exception): void
     {
         $message = __('bot.'.$exception->reason, [
-            'input' => $this->quote($text),
+            'input' => $exception->reason === InvalidTimeException::LETTERS ? $this->quote($text) : $this->quoteLtr($text),
             'example' => $kind === 'evening' ? '18:30' : '05:30',
         ]);
         $markup = $this->navigationKeyboard($fromSettings);
@@ -1296,6 +1300,15 @@ class TelegramUpdateProcessor
     private function quote(string $text): string
     {
         return e(Str::limit(trim($text), 40));
+    }
+
+    /**
+     * For digits and punctuation on a line of their own: the leading left-to-right mark makes Telegram
+     * lay the line out left to right, so "2;01" is not shown as "01;2" inside the Arabic message.
+     */
+    private function quoteLtr(string $text): string
+    {
+        return "\u{200E}".$this->quote($text);
     }
 
     private function safeAnswer(string $callbackId, string $text = ''): void

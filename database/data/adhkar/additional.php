@@ -213,6 +213,7 @@ return [
         'guidance_note' => null,
         'notes' => 'صيغة مختصرة يقولها المسلم عند ذكر النبي ﷺ.',
         'order' => 11,
+        'active' => false,
         'collections' => ['additional'],
     ],
 ];

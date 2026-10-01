@@ -114,7 +114,7 @@ class OnboardingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($text, 'الفاصل بين الساعة والدقائق غير صحيح')
-                && str_contains($text, '7;42')
+                && str_contains($text, "كتبت:\n\u{200E}7;42\n")
                 && str_contains($markup, 'onb:time:morning:0742')
                 && str_contains($markup, 'nav:cancel');
         });

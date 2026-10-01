@@ -44,14 +44,16 @@ class AdditionalAndCompletionTest extends TestCase
         $this->assertSame(0, ReminderLog::query()->where('collection_key', 'additional')->count());
     }
 
-    public function test_salawat_group_starts_with_the_short_salawat_and_navigates_in_place(): void
+    public function test_salawat_group_is_labelled_with_the_salawat_and_navigates_in_place(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
-        $item = AdhkarItem::query()->where('key', 'additional.11')->firstOrFail();
-        $this->assertSame('صلى الله عليه وسلم', $item->title);
+        $hidden = AdhkarItem::query()->where('key', 'additional.11')->firstOrFail();
+        $this->assertFalse($hidden->active);
+        $item = AdhkarItem::query()->where('key', 'additional.09')->firstOrFail();
 
         $this->process($this->telegramMessagePayload('🌟 أذكار إضافية', 20));
-        Http::assertSent(fn ($request) => ($request['text'] ?? null) === '🌟 أذكار وفضائل إضافية');
+        Http::assertSent(fn ($request) => ($request['text'] ?? null) === '🌟 أذكار وفضائل إضافية'
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'الصلاة على النبي ﷺ'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'قسم اختياري'));
 
         $this->process($this->telegramCallbackPayload('add:group:salawat', 21));
@@ -60,13 +62,14 @@ class AdditionalAndCompletionTest extends TestCase
             $first = $markup['inline_keyboard'][0][0] ?? [];
 
             return str_contains($request->url(), 'editMessageText')
-                && ($first['text'] ?? '') === 'صلى الله عليه وسلم'
                 && ($first['callback_data'] ?? '') === 'add:item:'.$item->id.':salawat';
         });
 
-        $this->process($this->telegramCallbackPayload('add:item:'.$item->id.':salawat', 22));
+        $this->process($this->telegramCallbackPayload('add:group:all', 22));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'صلى الله عليه وسلم'));
+
+        $this->process($this->telegramCallbackPayload('add:item:'.$item->id.':salawat', 23));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
-            && str_contains((string) ($request['text'] ?? ''), 'صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:salawat'));
     }
 
