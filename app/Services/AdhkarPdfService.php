@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\AdhkarItem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Mpdf\Config\ConfigVariables;
+use Mpdf\Config\FontVariables;
 use Mpdf\Mpdf;
 
 class AdhkarPdfService
@@ -18,7 +20,7 @@ class AdhkarPdfService
      */
     public function contentHash(string $collectionKey, Collection $items, bool $fullOnly = false): string
     {
-        $parts = [$collectionKey, $fullOnly ? 'f' : '', (string) filemtime($this->viewPath())];
+        $parts = [$collectionKey, $fullOnly ? 'f' : '', md5_file($this->viewPath()), md5_file(__FILE__)];
         foreach ($items as $item) {
             $parts[] = $item->key.'@'.$item->content_version;
         }
@@ -40,7 +42,7 @@ class AdhkarPdfService
 
         if (! is_file($path)) {
             File::ensureDirectoryExists($directory);
-            $this->render($collectionKey, $items, $title, $path);
+            $this->render($collectionKey, $items, $fullOnly, $title, $path);
         }
 
         return ['path' => $path, 'filename' => $filename, 'title' => $title, 'hash' => $hash];
@@ -49,31 +51,48 @@ class AdhkarPdfService
     /**
      * @param  Collection<int, AdhkarItem>  $items
      */
-    private function render(string $collectionKey, Collection $items, string $title, string $path): void
+    private function render(string $collectionKey, Collection $items, bool $fullOnly, string $title, string $path): void
     {
         $tempDir = storage_path('app/mpdf');
         File::ensureDirectoryExists($tempDir);
+
+        $fontDirs = (new ConfigVariables)->getDefaults()['fontDir'];
+        $fontData = (new FontVariables)->getDefaults()['fontdata'];
 
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A5',
             'directionality' => 'rtl',
-            'default_font' => 'xbriyaz',
-            'autoScriptToLang' => true,
-            'autoLangToFont' => true,
+            'fontDir' => [...$fontDirs, resource_path('fonts/amiri')],
+            'fontdata' => $fontData + [
+                'amiri' => [
+                    'R' => 'Amiri-Regular.ttf',
+                    'B' => 'Amiri-Bold.ttf',
+                    'useOTL' => 0xFF,
+                    'useKashida' => 75,
+                ],
+            ],
+            'default_font' => 'amiri',
+            // Automatic script detection would swap Arabic runs to mPDF's own Arabic font.
+            'autoScriptToLang' => false,
+            'autoLangToFont' => false,
             'tempDir' => $tempDir,
-            'margin_top' => 14,
-            'margin_bottom' => 14,
-            'margin_left' => 12,
-            'margin_right' => 12,
+            'margin_top' => 22,
+            'margin_bottom' => 18,
+            'margin_left' => 13,
+            'margin_right' => 13,
+            'margin_header' => 8,
+            'margin_footer' => 8,
         ]);
         $mpdf->SetTitle($title);
-        $mpdf->SetHTMLFooter('<div style="text-align:center;font-size:9pt;color:#829ab1;">صفحة {PAGENO} من {nbpg}</div>');
 
         $html = view('pdf.wird', [
             'title' => $title,
+            'heading' => str_starts_with($collectionKey, 'evening') ? 'أذكار المساء' : 'أذكار الصباح',
+            'subtitle' => $this->subtitle($collectionKey, $fullOnly, $items->count()),
             'items' => $items->values(),
             'footer' => $this->content->footerText($collectionKey),
+            't' => fn (?string $text): string => $this->typeset($text),
         ])->render();
 
         $mpdf->WriteHTML($html);
@@ -82,6 +101,37 @@ class AdhkarPdfService
         $partial = $path.'.'.getmypid().'.tmp';
         $mpdf->Output($partial, 'F');
         rename($partial, $path);
+    }
+
+    /**
+     * mPDF mirrors guillemets a second time in RTL runs, and Amiri has no emoji glyphs.
+     */
+    private function typeset(?string $text): string
+    {
+        $text = strtr((string) $text, ['«' => '»', '»' => '«']);
+        $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]/u', '', $text) ?? $text;
+
+        $text = preg_replace(['/[ \t]{2,}/u', '/[ \t]*\n[ \t]*/u'], [' ', "\n"], $text) ?? $text;
+
+        return trim($text);
+    }
+
+    private function subtitle(string $collectionKey, bool $fullOnly, int $count): string
+    {
+        $wird = match (true) {
+            $fullOnly => 'تتمة الورد الكامل',
+            str_contains($collectionKey, '_full') => 'الورد الكامل',
+            default => 'الورد المختصر',
+        };
+
+        $amount = match (true) {
+            $count === 1 => 'ذكر واحد',
+            $count === 2 => 'ذكران',
+            $count <= 10 => $count.' أذكار',
+            default => $count.' ذكرًا',
+        };
+
+        return $wird.' · '.$amount;
     }
 
     private function viewPath(): string
