@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\InvalidTimeException;
 use App\Services\ReminderScheduleCalculator;
 use Carbon\Carbon;
 use InvalidArgumentException;
@@ -48,6 +49,40 @@ class ReminderScheduleCalculatorTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         ReminderScheduleCalculator::normalizeTime('25:61');
+    }
+
+    /**
+     * @return array<string, array{string, string, ?string}>
+     */
+    public static function timeErrors(): array
+    {
+        return [
+            'empty' => ['  ', InvalidTimeException::EMPTY, null],
+            'letters' => ['الصبح', InvalidTimeException::LETTERS, null],
+            'semicolon' => ['7;42', InvalidTimeException::BAD_SEPARATOR, '07:42'],
+            'comma' => ['18,30', InvalidTimeException::BAD_SEPARATOR, '18:30'],
+            'comma with three-digit minutes' => ['7,090', InvalidTimeException::BAD_SEPARATOR, null],
+            'no separator' => ['0730', InvalidTimeException::BAD_SEPARATOR, '07:30'],
+            'bare hour' => ['7', InvalidTimeException::MISSING_MINUTES, '07:00'],
+            'trailing colon' => ['7:', InvalidTimeException::MISSING_MINUTES, '07:00'],
+            'hour too large' => ['25:00', InvalidTimeException::HOUR_RANGE, null],
+            'bare hour too large' => ['30', InvalidTimeException::HOUR_RANGE, null],
+            'minutes too large' => ['7:75', InvalidTimeException::MINUTE_RANGE, null],
+            'three-digit minutes' => ['7:090', InvalidTimeException::MINUTE_DIGITS, null],
+            'one-digit minutes' => ['7:5', InvalidTimeException::MINUTE_DIGITS, '07:05'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('timeErrors')]
+    public function test_each_time_mistake_has_its_own_reason(string $input, string $reason, ?string $suggestion): void
+    {
+        try {
+            ReminderScheduleCalculator::classifyTime($input, 'morning');
+            $this->fail("Expected {$reason} for '{$input}'");
+        } catch (InvalidTimeException $exception) {
+            $this->assertSame($reason, $exception->reason);
+            $this->assertSame($suggestion, $exception->suggestion);
+        }
     }
 
     public function test_is_valid_time(): void

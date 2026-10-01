@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\InvalidTimeException;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use InvalidArgumentException;
@@ -94,6 +95,9 @@ class ReminderScheduleCalculator
     private static function parseTimeParts(string $localTime): array
     {
         $localTime = self::toAsciiDigits(trim($localTime));
+        if ($localTime === '') {
+            throw new InvalidTimeException(InvalidTimeException::EMPTY);
+        }
         $localTime = str_replace(['.', '٫'], ':', $localTime);
         $localTime = preg_replace('/\s+/u', ' ', $localTime) ?? $localTime;
 
@@ -104,12 +108,15 @@ class ReminderScheduleCalculator
         }
 
         if (preg_match('/^([01]?\d|2[0-3])(?::([0-5]\d)(?::([0-5]\d))?)?$/', $localTime, $matches) !== 1) {
-            throw new InvalidArgumentException('invalid_time');
+            throw self::diagnose($localTime, $suffix);
         }
 
         $minute = $matches[2] ?? null;
         if ($minute === null && $suffix === null) {
-            throw new InvalidArgumentException('invalid_time');
+            throw new InvalidTimeException(
+                InvalidTimeException::MISSING_MINUTES,
+                sprintf('%02d:00', (int) $matches[1]),
+            );
         }
 
         return [
@@ -118,6 +125,85 @@ class ReminderScheduleCalculator
             'second' => (int) ($matches[3] ?? 0),
             'suffix' => $suffix,
         ];
+    }
+
+    /**
+     * Explains why a value that failed the strict pattern is not a time.
+     */
+    private static function diagnose(string $value, ?string $suffix): InvalidTimeException
+    {
+        if ($value === '') {
+            return new InvalidTimeException(InvalidTimeException::EMPTY);
+        }
+
+        if (preg_match('/\p{L}/u', $value) === 1) {
+            return new InvalidTimeException(InvalidTimeException::LETTERS);
+        }
+
+        if (preg_match('/^(\d+)\s*(?:[;,\-\/_،؛\\\\|]+|\s+)\s*(\d+)$/u', $value, $parts) === 1) {
+            return new InvalidTimeException(
+                InvalidTimeException::BAD_SEPARATOR,
+                self::suggestion($parts[1], $parts[2], $suffix),
+            );
+        }
+
+        if (preg_match('/^\d+$/', $value) === 1) {
+            if (strlen($value) <= 2) {
+                return new InvalidTimeException(InvalidTimeException::HOUR_RANGE);
+            }
+            if (strlen($value) <= 4) {
+                $suggestion = self::suggestion(substr($value, 0, -2), substr($value, -2), $suffix);
+                if ($suggestion !== null) {
+                    return new InvalidTimeException(InvalidTimeException::BAD_SEPARATOR, $suggestion);
+                }
+            }
+
+            return new InvalidTimeException(InvalidTimeException::FORMAT);
+        }
+
+        if (preg_match('/^(\d+):(\d*)(?::\d*)?$/', $value, $parts) === 1) {
+            if (strlen($parts[1]) > 2 || (int) $parts[1] > 23) {
+                return new InvalidTimeException(InvalidTimeException::HOUR_RANGE);
+            }
+            if ($parts[2] === '') {
+                return new InvalidTimeException(
+                    InvalidTimeException::MISSING_MINUTES,
+                    sprintf('%02d:00', (int) $parts[1]),
+                );
+            }
+            if (strlen($parts[2]) !== 2) {
+                $suggestion = strlen($parts[2]) === 1
+                    ? sprintf('%02d:0%d', (int) $parts[1], (int) $parts[2])
+                    : null;
+
+                return new InvalidTimeException(InvalidTimeException::MINUTE_DIGITS, $suggestion);
+            }
+
+            return new InvalidTimeException(InvalidTimeException::MINUTE_RANGE);
+        }
+
+        return new InvalidTimeException(InvalidTimeException::FORMAT);
+    }
+
+    private static function suggestion(string $hour, string $minute, ?string $suffix): ?string
+    {
+        if (strlen($hour) > 2 || strlen($minute) !== 2) {
+            return null;
+        }
+
+        $h = (int) $hour;
+        $m = (int) $minute;
+        if ($m > 59 || $h > 23 || ($suffix !== null && $h > 12)) {
+            return null;
+        }
+
+        if ($suffix === 'pm' && $h < 12) {
+            $h += 12;
+        } elseif ($suffix === 'am' && $h === 12) {
+            $h = 0;
+        }
+
+        return sprintf('%02d:%02d', $h, $m);
     }
 
     private static function suffixPeriod(string $token): string
@@ -136,7 +222,7 @@ class ReminderScheduleCalculator
         }
 
         if ($hour > 23) {
-            throw new InvalidArgumentException('invalid_time');
+            throw new InvalidTimeException(InvalidTimeException::HOUR_RANGE);
         }
 
         return sprintf('%02d:%02d:%02d', $hour, $minute, $second);
