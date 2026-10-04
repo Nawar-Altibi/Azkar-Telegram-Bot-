@@ -165,16 +165,11 @@ class KeyboardFactory
     public function readingNav(array $actions): array
     {
         $rows = [];
-        $nav = [];
-        // تلغرام يرسم أول زر في الصف على اليسار. السابق يسار، التالي يمين.
-        if (isset($actions['prev'])) {
-            $nav[] = ['text' => 'السابق', 'callback_data' => $actions['prev']];
-        }
         if (isset($actions['next'])) {
-            $nav[] = ['text' => 'التالي', 'callback_data' => $actions['next']];
+            $rows[] = [['text' => 'التالي ⬅️', 'callback_data' => $actions['next']]];
         }
-        if ($nav !== []) {
-            $rows[] = $nav;
+        if (isset($actions['prev'])) {
+            $rows[] = [['text' => '➡️ السابق', 'callback_data' => $actions['prev']]];
         }
         if (isset($actions['save'])) {
             $rows[] = [['text' => '📥 أرسل الورد كاملًا', 'callback_data' => $actions['save']]];

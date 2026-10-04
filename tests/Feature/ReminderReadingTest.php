@@ -63,7 +63,7 @@ class ReminderReadingTest extends TestCase
 
         $this->assertNotEmpty($first);
         $this->assertSame($first, $second);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بدأت هذه الأذكار'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بلّشت بهالأذكار من قبل'));
     }
 
     public function test_claim_rollback_does_not_send_chunks(): void
@@ -94,7 +94,7 @@ class ReminderReadingTest extends TestCase
 
         $this->assertSame($before, ReminderLog::query()->count());
         $this->assertNull($log->fresh()->reading_started_at);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هذا التذكير انتهى'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هالتذكير كان لوقت وخلص'));
         Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'today:menu'));
         $this->assertSame([], $this->readingMessages());
     }
@@ -111,7 +111,7 @@ class ReminderReadingTest extends TestCase
 
         $this->assertNull($log->fresh()->reading_started_at);
         $this->assertSame('morning_short', $log->fresh()->collection_key);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هذا التذكير انتهى'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هالتذكير كان لوقت وخلص'));
     }
 
     public function test_start_from_another_user_does_not_write(): void
@@ -203,7 +203,7 @@ class ReminderReadingTest extends TestCase
         $log->refresh();
         $this->assertNotNull($log->reading_started_at);
         $this->assertNotNull($log->content_snapshot_hash);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'حدث خطأ أثناء إرسال الأذكار'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما وصلت الأذكار'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'secret-api-error'));
 
         $before = $this->readingMessages();
@@ -261,7 +261,7 @@ class ReminderReadingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($request->url(), 'editMessageText')
-                && str_contains((string) ($request['text'] ?? ''), 'أي ورد تريد قراءته الآن')
+                && str_contains((string) ($request['text'] ?? ''), 'أي ورد بتحب تقرأ هلق')
                 && str_contains($markup, 'rt:m:s:0')
                 && str_contains($markup, 'rt:m:a:0');
         });
@@ -312,8 +312,8 @@ class ReminderReadingTest extends TestCase
 
             return str_contains($request->url(), 'editMessageText')
                 && str_contains((string) ($request['text'] ?? ''), 'الذكر 2 من')
-                && ($row[0]['text'] ?? '') === 'السابق'
-                && ($row[1]['text'] ?? '') === 'التالي';
+                && ($row[0]['text'] ?? '') === 'التالي ⬅️'
+                && ($markup['inline_keyboard'][1][0]['text'] ?? '') === '➡️ السابق';
         });
 
         app(TelegramUpdateProcessor::class)->handle(

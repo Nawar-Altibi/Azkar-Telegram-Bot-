@@ -123,10 +123,14 @@ class OnboardingService
     public function finish(User $user): array
     {
         $this->settings->completeOnboarding($user);
+        $fresh = $user->fresh() ?? $user;
 
         return [
-            'text' => __('bot.onboarding_complete', ['summary' => $this->summary($user->fresh())]),
-            'reply_markup' => $this->keyboards->mainReplyKeyboard($user->fresh()),
+            'text' => __('bot.onboarding_complete', [
+                'morning' => $fresh->formattedMorningTime() ?: '—',
+                'evening' => $fresh->formattedEveningTime() ?: '—',
+            ]),
+            'reply_markup' => $this->keyboards->mainReplyKeyboard($fresh),
         ];
     }
 

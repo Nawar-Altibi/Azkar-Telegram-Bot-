@@ -86,7 +86,7 @@ class SettingsPauseResumeTest extends TestCase
             fn ($pair) => str_contains($pair[0]->url(), 'sendMessage')
         )->count());
         Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
-            && str_contains((string) ($request['text'] ?? ''), 'تم حفظ وقت الصباح'));
+            && str_contains((string) ($request['text'] ?? ''), 'رح نذكّرك بأذكار الصباح'));
     }
 
     public function test_pausing_from_settings_asks_first_and_offers_undo(): void

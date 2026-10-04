@@ -129,7 +129,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertStringNotContainsString('💡', $text);
 
-        $this->assertSame([['text' => 'التالي', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
+        $this->assertSame([['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
         $this->assertSame('sv:t:b:a', $markup['inline_keyboard'][1][0]['callback_data']);
         $this->assertSame('📥 أرسل الورد كاملًا', $markup['inline_keyboard'][1][0]['text']);
         $this->assertCount(2, $markup['inline_keyboard']);
@@ -158,13 +158,13 @@ class BedtimeWakingTest extends TestCase
 
         $this->press('rt:b:a:1', 40);
         $request = $this->lastSent('editMessageText');
-        $row = $this->markup($request)['inline_keyboard'][0];
+        $rows = $this->markup($request)['inline_keyboard'];
         $this->assertStringContainsString('الذكر 2 من 13', (string) $request['text']);
         $this->assertStringContainsString('آية الكرسي', (string) $request['text']);
         $this->assertStringContainsString('💡 الفضل', (string) $request['text']);
-        // First button in a row renders on the left: السابق left, التالي right.
-        $this->assertSame(['السابق', 'التالي'], array_column($row, 'text'));
-        $this->assertSame(['rt:b:a:0', 'rt:b:a:2'], array_column($row, 'callback_data'));
+        // Next fills a whole row so it is the easiest button to hit; previous sits under it.
+        $this->assertSame([['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:2']], $rows[0]);
+        $this->assertSame([['text' => '➡️ السابق', 'callback_data' => 'rt:b:a:0']], $rows[1]);
 
         $this->press('rt:b:a:0', 41);
         $this->assertStringContainsString('الذكر 1 من 13', (string) $this->lastSent('editMessageText')['text']);
@@ -192,10 +192,10 @@ class BedtimeWakingTest extends TestCase
         foreach (['rt:b:s:0', 'rt:w:f:0', 'rt:x:a:0', 'sv:t:b:s', 'sv:t:x:a'] as $index => $data) {
             $this->press($data, 50 + $index);
         }
-        $toasts = collect(Http::recorded())
-            ->filter(fn ($pair) => str_contains($pair[0]->url(), 'answerCallbackQuery'))
+        $replies = collect(Http::recorded())
+            ->filter(fn ($pair) => str_contains($pair[0]->url(), 'sendMessage'))
             ->map(fn ($pair) => (string) ($pair[0]['text'] ?? ''));
-        $this->assertCount(5, $toasts->filter(fn ($t) => $t === __('bot.unknown')));
+        $this->assertCount(5, $replies->filter(fn ($t) => $t === __('bot.old_button')));
 
         $this->press('rt:b:a:13', 60);
         Http::assertSent(fn ($r) => (string) ($r['text'] ?? '') === __('bot.content_missing'));

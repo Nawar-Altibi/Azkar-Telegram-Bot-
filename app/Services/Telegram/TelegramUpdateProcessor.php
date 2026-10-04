@@ -64,7 +64,30 @@ class TelegramUpdateProcessor
 
         if ($update->message?->text) {
             $this->handleMessage($user, $update);
+
+            return;
         }
+
+        if ($update->message !== null) {
+            $this->handleNonTextMessage($user, $update->message->kind);
+        }
+    }
+
+    private function handleNonTextMessage(User $user, string $kind): void
+    {
+        $key = in_array($kind, ['voice', 'audio', 'photo', 'sticker', 'video', 'video_note', 'animation', 'document', 'contact', 'location'], true)
+            ? $kind
+            : 'other';
+        $text = __('bot.media.'.$key);
+
+        if ($user->onboarding_state !== OnboardingState::Completed) {
+            $screen = $this->onboarding->start($user);
+            $this->reply($user, $text."\n\n".$screen['text'], $screen['reply_markup']);
+
+            return;
+        }
+
+        $this->reply($user, $text."\n\n".__('bot.media_hint'), $this->keyboards->mainReplyKeyboard($user));
     }
 
     private function findOrCreateUser(TelegramUser $from, int $chatId): User
@@ -354,6 +377,14 @@ class TelegramUpdateProcessor
 
         $data = $callback->data;
 
+        $window = (int) config('telegram.double_press_seconds', 2);
+        $pressKey = 'telegram:press:'.$user->id.':'.sha1($data.'|'.($callback->message?->messageId ?? 0));
+        if ($window > 0 && ! Cache::add($pressKey, true, $window)) {
+            $this->safeAnswer($callback->id);
+
+            return;
+        }
+
         try {
             $this->routeCallback($user, $data, $callback->id, $callback->message?->messageId);
         } catch (Throwable $exception) {
@@ -530,7 +561,17 @@ class TelegramUpdateProcessor
             return;
         }
 
-        $this->safeAnswer($callbackId, __('bot.unknown'));
+        $this->replyOldButton($user, $callbackId);
+    }
+
+    private function replyOldButton(User $user, string $callbackId): void
+    {
+        $this->safeAnswer($callbackId);
+        $this->reply(
+            $user,
+            __('bot.old_button'),
+            $user->isOnboarded() ? $this->keyboards->mainReplyKeyboard($user) : null,
+        );
     }
 
     private function handleTimezoneCallback(User $user, string $data, string $callbackId, ?int $messageId): void
@@ -750,7 +791,7 @@ class TelegramUpdateProcessor
             return;
         }
 
-        $this->safeAnswer($callbackId, __('bot.unknown'));
+        $this->replyOldButton($user, $callbackId);
     }
 
     private function additionalGroupTitle(string $groupKey): string
@@ -976,7 +1017,7 @@ class TelegramUpdateProcessor
         $parts = explode(':', $data);
         $phase = $parts[2] ?? '';
         if (! in_array($phase, ['s', 'f', 'a'], true)) {
-            $this->safeAnswer($callbackId, __('bot.unknown'));
+            $this->replyOldButton($user, $callbackId);
 
             return;
         }
@@ -1013,7 +1054,7 @@ class TelegramUpdateProcessor
         $phase = $parts[2] ?? '';
         $baseKey = $this->content->manualBaseKey($period, $phase);
         if ($baseKey === null) {
-            $this->safeAnswer($callbackId, __('bot.unknown'));
+            $this->replyOldButton($user, $callbackId);
 
             return;
         }
@@ -1185,7 +1226,7 @@ class TelegramUpdateProcessor
             $phase = $parts[3] ?? '';
             $baseKey = $this->content->manualBaseKey($parts[2] ?? '', $phase);
             if ($baseKey === null) {
-                $this->safeAnswer($callbackId, __('bot.unknown'));
+                $this->replyOldButton($user, $callbackId);
 
                 return;
             }
@@ -1196,7 +1237,7 @@ class TelegramUpdateProcessor
         }
 
         if ($session === null) {
-            $this->safeAnswer($callbackId, __('bot.unknown'));
+            $this->replyOldButton($user, $callbackId);
 
             return;
         }

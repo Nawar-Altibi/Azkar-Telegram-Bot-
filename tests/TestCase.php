@@ -42,6 +42,21 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * A message without text, such as a voice note or a shared location.
+     *
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    protected function telegramMediaPayload(array $fields, int $updateId = 1, int $userId = 1001): array
+    {
+        $payload = $this->telegramMessagePayload('', $updateId, $userId);
+        unset($payload['message']['text']);
+        $payload['message'] += $fields;
+
+        return $payload;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function telegramCallbackPayload(string $data, int $updateId = 2, int $userId = 1001): array

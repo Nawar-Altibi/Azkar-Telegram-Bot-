@@ -76,7 +76,7 @@ class OnboardingTest extends TestCase
         $this->assertNotNull($user->next_evening_at);
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sendMessage')
-                && str_contains((string) ($request['text'] ?? ''), 'تم ضبط تذكيراتك')
+                && str_contains((string) ($request['text'] ?? ''), 'كل شي جاهز')
                 && ! str_contains((string) ($request['text'] ?? ''), 'الورد:')
                 && str_contains((string) ($request['reply_markup'] ?? ''), '"keyboard"');
         });
@@ -145,10 +145,10 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramMessagePayload('123', 5));
 
         Http::assertSent(function ($request) {
-            return str_contains((string) ($request['text'] ?? ''), 'لم أجد «زحل»')
+            return str_contains((string) ($request['text'] ?? ''), 'ما لقيت «زحل»')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'nav:back');
         });
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بالحروف لا بالأرقام'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اسم البلد بينكتب بالحروف'));
     }
 
     public function test_unrelated_text_during_onboarding_shows_the_current_step(): void
@@ -165,8 +165,8 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramMessagePayload('مرحبا', 1));
 
         Http::assertSent(function ($request) {
-            return str_contains((string) ($request['text'] ?? ''), 'ما زلنا في الإعداد')
-                && str_contains((string) ($request['text'] ?? ''), 'متى تفضّل تذكير أذكار الصباح')
+            return str_contains((string) ($request['text'] ?? ''), 'لسا عم نكمّل الإعداد')
+                && str_contains((string) ($request['text'] ?? ''), 'بتحب نذكّرك بأذكار الصباح')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:time:morning:');
         });
     }
@@ -387,7 +387,7 @@ class OnboardingTest extends TestCase
         $this->assertSame('06:00:00', $fresh->morning_time);
         $this->assertNull($fresh->evening_time);
         $this->assertSame('سوريا', $fresh->timezone_label);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'متى تفضّل تذكير أذكار المساء'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بتحب نذكّرك بأذكار المساء'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
     }

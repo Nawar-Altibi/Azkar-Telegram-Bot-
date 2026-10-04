@@ -33,6 +33,7 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="TELEGRAM_BOT_TOKEN" value="test-token"/>
         <env name="TELEGRAM_WEBHOOK_SECRET" value="test-secret"/>
+        <env name="TELEGRAM_DOUBLE_PRESS_SECONDS" value="0"/>
         <env name="CRON_SECRET" value="test-cron-secret"/>
     </php>
 </phpunit>
