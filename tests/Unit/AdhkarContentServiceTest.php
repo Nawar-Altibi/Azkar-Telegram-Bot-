@@ -188,7 +188,9 @@ class AdhkarContentServiceTest extends TestCase
             'hadith_number' => null,
             'hadith_grade' => null,
         ]);
-        $this->assertStringContainsString('<blockquote>📚 صحيح البخاري</blockquote>', app(AdhkarContentService::class)->formatItem($plain, 1));
+        $sourceOnly = app(AdhkarContentService::class)->formatItem($plain, 1);
+        $this->assertStringContainsString('📚 صحيح البخاري', $sourceOnly);
+        $this->assertStringNotContainsString('blockquote', $sourceOnly);
     }
 
     public function test_card_never_shows_the_narrator_or_guidance_note(): void

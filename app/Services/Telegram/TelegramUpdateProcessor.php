@@ -231,7 +231,7 @@ class TelegramUpdateProcessor
     private function handleCommand(User $user, string $command): void
     {
         match ($command) {
-            '/start' => $this->sendResponse($user, $this->onboarding->start($user)),
+            '/start' => $this->sendStart($user),
             '/settings' => $this->sendSettings($user),
             '/help' => $this->showHelpMenu($user, null),
             '/pause' => $this->handlePause($user),
@@ -239,6 +239,26 @@ class TelegramUpdateProcessor
             '/today' => $this->showTodayMenu($user, null),
             default => $this->reply($user, __('bot.unknown')),
         };
+    }
+
+    /**
+     * A returning user only sees the inline menu on /start, so the bottom buttons stay hidden
+     * until something else sends them. When they are set to stay visible, send them with a short note.
+     */
+    private function sendStart(User $user): void
+    {
+        $response = $this->onboarding->start($user);
+        $persistent = $user->isOnboarded() && ($user->keyboard_persistent ?? true);
+
+        if ($user->isOnboarded() && ! $persistent) {
+            $response['text'] .= "\n\n".__('bot.keyboard_hidden_hint');
+        }
+
+        $this->sendResponse($user, $response);
+
+        if ($persistent) {
+            $this->reply($user, __('bot.keyboard_visible_hint'), $this->keyboards->mainReplyKeyboard($user));
+        }
     }
 
     private function handleReplyKeyboard(User $user, string $text): bool
@@ -980,13 +1000,10 @@ class TelegramUpdateProcessor
             }
 
             $this->safeAnswer($callbackId);
-            $total = $items->count();
-            $text = "🌟 <b>أذكار إضافية</b>\nالذكر ".($position + 1)." من {$total}\n\n"
-                .$this->content->formatItem($items[$position], $position + 1);
             $this->show(
                 $user,
-                $text,
-                $this->keyboards->additionalItem($items[$position - 1]->id ?? null, $items[$position + 1]->id ?? null),
+                $this->content->formatItem($items[$position], $position + 1),
+                $this->keyboards->additionalItem(),
                 $messageId,
             );
 

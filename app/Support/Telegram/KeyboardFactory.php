@@ -204,10 +204,10 @@ class KeyboardFactory
     {
         $rows = [];
         if (isset($actions['next'])) {
-            $rows[] = [['text' => 'التالي ⬅️', 'callback_data' => $actions['next']]];
+            $rows[] = [['text' => '➡️ التالي', 'callback_data' => $actions['next']]];
         }
         if (isset($actions['prev'])) {
-            $rows[] = [['text' => '➡️ السابق', 'callback_data' => $actions['prev']]];
+            $rows[] = [['text' => 'السابق ⬅️', 'callback_data' => $actions['prev']]];
         }
         if (isset($actions['switch_to_full'])) {
             $rows[] = [['text' => '📖 بدّل للورد الكامل', 'callback_data' => $actions['switch_to_full']]];
@@ -274,22 +274,23 @@ class KeyboardFactory
      * @return array<string, mixed>
      */
     /**
-     * @param  string|null  $period  morning, evening or night from DayPeriod; that choice goes first and is marked
+     * @param  string|null  $period  morning, evening or night from DayPeriod; that choice goes first and is colored
      */
     public function todayMenu(?string $period = null): array
     {
-        $now = ' · ⭐ وقتها هلق';
         $morning = ['text' => '🌅 أذكار الصباح', 'callback_data' => 'today:morning'];
         $evening = ['text' => '🌙 أذكار المساء', 'callback_data' => 'today:evening'];
+        $bedtime = ['text' => '🛌 أذكار النوم', 'callback_data' => 'today:bedtime'];
+        $current = function (array $button): array {
+            $button['style'] = 'primary';
+
+            return $button;
+        };
 
         $choices = match ($period) {
-            'morning' => [['text' => $morning['text'].$now] + $morning, $evening],
-            'evening' => [['text' => $evening['text'].$now] + $evening, $morning],
-            'night' => [
-                ['text' => '🛌 أذكار النوم'.$now, 'callback_data' => 'today:bedtime'],
-                $evening,
-                $morning,
-            ],
+            'morning' => [$current($morning), $evening],
+            'evening' => [$current($evening), $morning],
+            'night' => [$current($bedtime), $evening, $morning],
             default => [$morning, $evening],
         };
 
@@ -361,20 +362,13 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function additionalItem(?int $prevId, ?int $nextId): array
+    public function additionalItem(): array
     {
-        $nav = [];
-        if ($nextId !== null) {
-            $nav[] = ['text' => 'التالي ⬅️', 'callback_data' => 'add:item:'.$nextId];
-        }
-        if ($prevId !== null) {
-            $nav[] = ['text' => '➡️ السابق', 'callback_data' => 'add:item:'.$prevId];
-        }
-
-        $rows = $nav === [] ? [] : [$nav];
-        $rows[] = [['text' => '📋 كل الأذكار الإضافية', 'callback_data' => 'add:list']];
-
-        return ['inline_keyboard' => $rows];
+        return [
+            'inline_keyboard' => [
+                [['text' => '📋 كل الأذكار الإضافية', 'callback_data' => 'add:list']],
+            ],
+        ];
     }
 
     /**

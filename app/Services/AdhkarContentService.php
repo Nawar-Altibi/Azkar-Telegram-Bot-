@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AdhkarCategory;
 use App\Enums\AdhkarMode;
 use App\Enums\ReminderType;
 use App\Models\AdhkarCollection;
@@ -267,14 +268,18 @@ class AdhkarContentService
     public function formatItem(AdhkarItem $item, int $number): string
     {
         $lines = [];
-        $title = $item->title ?: "الذكر {$number}";
-        $lines[] = '<b>'.$this->escape($title).'</b>';
+        if ($item->category !== AdhkarCategory::Waking) {
+            $title = $item->title ?: "الذكر {$number}";
+            $lines[] = '<b>'.$this->escape($title).'</b>';
+        }
 
         if (filled($item->repetitions_label)) {
             $lines[] = '🔁 <b>التكرار: '.$this->escape($item->repetitions_label).'</b>';
         }
 
-        $lines[] = '';
+        if ($lines !== []) {
+            $lines[] = '';
+        }
         $lines[] = $this->escape((string) $item->arabic_text);
 
         $details = [];
@@ -297,23 +302,22 @@ class AdhkarContentService
 
         if ($details !== []) {
             $lines[] = '';
-            $lines[] = $this->detailsBlock($details, filled($item->virtue));
+            $lines[] = filled($item->virtue)
+                ? $this->detailsBlock($details)
+                : implode("\n", $details);
         }
 
         return implode("\n", $lines);
     }
 
     /**
-     * الفضل والمصدر في اقتباس تحت نص الذكر، فيبقى الذكر نفسه أول ما يراه القارئ.
-     * ينطوي الاقتباس فقط إذا فيه فضل؛ المصدر وحده سطر قصير لا يحتاج طيًّا.
+     * الفضل والمصدر في اقتباس قابل للطي. المصدر بدون فضل يبقى سطرًا عاديًا.
      *
      * @param  array<int, string>  $escapedLines
      */
-    private function detailsBlock(array $escapedLines, bool $hasVirtue): string
+    private function detailsBlock(array $escapedLines): string
     {
-        $body = implode("\n", $escapedLines);
-
-        return ($hasVirtue ? '<blockquote expandable>' : '<blockquote>').$body.'</blockquote>';
+        return '<blockquote expandable>'.implode("\n", $escapedLines).'</blockquote>';
     }
 
     private function escape(string $text): string

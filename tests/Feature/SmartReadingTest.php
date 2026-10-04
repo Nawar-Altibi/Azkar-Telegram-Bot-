@@ -34,19 +34,23 @@ class SmartReadingTest extends TestCase
         $this->handle($this->telegramMessagePayload('/today', 1));
         $morning = $this->lastMarkup();
         $this->assertSame('today:morning', $morning['inline_keyboard'][0][0]['callback_data']);
-        $this->assertStringContainsString('وقتها هلق', $morning['inline_keyboard'][0][0]['text']);
+        $this->assertSame('primary', $morning['inline_keyboard'][0][0]['style'] ?? null);
+        $this->assertSame('🌅 أذكار الصباح', $morning['inline_keyboard'][0][0]['text']);
+        $this->assertArrayNotHasKey('style', $morning['inline_keyboard'][1][0]);
         $this->assertStringContainsString('صباح الخير', $this->lastText());
 
         $this->travelTo(Carbon::parse('2026-03-10 17:30:00', 'Asia/Damascus'));
         $this->handle($this->telegramMessagePayload('/today', 2));
         $evening = $this->lastMarkup();
         $this->assertSame('today:evening', $evening['inline_keyboard'][0][0]['callback_data']);
+        $this->assertSame('primary', $evening['inline_keyboard'][0][0]['style'] ?? null);
         $this->assertSame('today:morning', $evening['inline_keyboard'][1][0]['callback_data']);
 
         $this->travelTo(Carbon::parse('2026-03-10 23:00:00', 'Asia/Damascus'));
         $this->handle($this->telegramMessagePayload('/today', 3));
         $night = $this->lastMarkup();
         $this->assertSame('today:bedtime', $night['inline_keyboard'][0][0]['callback_data']);
+        $this->assertSame('primary', $night['inline_keyboard'][0][0]['style'] ?? null);
         $this->assertSame(
             ['today:bedtime', 'today:evening', 'today:morning'],
             collect($night['inline_keyboard'])->flatten(1)->pluck('callback_data')->all(),

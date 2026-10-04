@@ -316,8 +316,8 @@ class ReminderReadingTest extends TestCase
 
             return str_contains($request->url(), 'editMessageText')
                 && str_contains((string) ($request['text'] ?? ''), 'الذكر 2 من')
-                && ($row[0]['text'] ?? '') === 'التالي ⬅️'
-                && ($markup['inline_keyboard'][1][0]['text'] ?? '') === '➡️ السابق';
+                && ($row[0]['text'] ?? '') === '➡️ التالي'
+                && ($markup['inline_keyboard'][1][0]['text'] ?? '') === 'السابق ⬅️';
         });
 
         app(TelegramUpdateProcessor::class)->handle(

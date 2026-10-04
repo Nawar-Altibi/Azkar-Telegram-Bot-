@@ -130,7 +130,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertStringNotContainsString('💡', $text);
 
-        $this->assertSame([['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
+        $this->assertSame([['text' => '➡️ التالي', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
         $this->assertSame('sv:t:b:a', $markup['inline_keyboard'][1][0]['callback_data']);
         $this->assertSame('📥 أرسل الورد كاملًا', $markup['inline_keyboard'][1][0]['text']);
         $this->assertCount(2, $markup['inline_keyboard']);
@@ -148,6 +148,8 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringStartsWith('☀️ أذكار الاستيقاظ', $text);
         $this->assertStringContainsString('الذكر 1 من 3', $text);
         $this->assertStringContainsString('أَحْيَانَا بَعْدَ مَا أَمَاتَنَا', $text);
+        $this->assertStringNotContainsString('الحمد لله الذي أحيانا', $text);
+        $this->assertStringNotContainsString('blockquote', $text);
         $this->assertStringNotContainsString('مختصر', $text);
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertSame('rt:w:a:1', $this->markup($request)['inline_keyboard'][0][0]['callback_data']);
@@ -191,8 +193,8 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringContainsString('آية الكرسي', (string) $request['text']);
         $this->assertStringContainsString('💡 الفضل', (string) $request['text']);
         // Next fills a whole row so it is the easiest button to hit; previous sits under it.
-        $this->assertSame([['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:2']], $rows[0]);
-        $this->assertSame([['text' => '➡️ السابق', 'callback_data' => 'rt:b:a:0']], $rows[1]);
+        $this->assertSame([['text' => '➡️ التالي', 'callback_data' => 'rt:b:a:2']], $rows[0]);
+        $this->assertSame([['text' => 'السابق ⬅️', 'callback_data' => 'rt:b:a:0']], $rows[1]);
 
         $this->press('rt:b:a:0', 41);
         $this->assertStringContainsString('الذكر 1 من 13', (string) $this->lastSent('editMessageText')['text']);

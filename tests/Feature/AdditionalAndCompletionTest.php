@@ -80,22 +80,25 @@ class AdditionalAndCompletionTest extends TestCase
         $this->assertStringNotContainsString('درجتها', $salawat->source_name);
     }
 
-    public function test_item_card_navigates_in_place_and_old_buttons_still_work(): void
+    public function test_item_card_shows_only_that_dhikr_and_old_buttons_still_open_it(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
         $items = AdhkarItem::query()->where('category', AdhkarCategory::Additional)->where('active', true)->orderBy('order')->get()->values();
         $second = $items[1];
 
         $this->process($this->telegramCallbackPayload('add:item:'.$second->id, 21));
-        Http::assertSent(function ($request) use ($items) {
+        Http::assertSent(function ($request) use ($second) {
             $text = (string) ($request['text'] ?? '');
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($request->url(), 'editMessageText')
-                && str_contains($text, 'الذكر 2 من '.$items->count())
+                && str_contains($text, $second->title)
+                && str_contains($text, mb_substr($second->arabic_text, 0, 40))
+                && ! str_contains($text, 'الذكر 2 من')
                 && ! str_contains($text, 'الراوي')
-                && str_contains($markup, 'add:item:'.$items[0]->id)
-                && str_contains($markup, 'add:item:'.$items[2]->id)
+                && ! str_contains($markup, 'التالي')
+                && ! str_contains($markup, 'السابق')
+                && ! str_contains($markup, 'add:item:')
                 && str_contains($markup, 'add:list');
         });
 
@@ -103,7 +106,8 @@ class AdditionalAndCompletionTest extends TestCase
             'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 1]], 200),
         ]);
         $this->process($this->telegramCallbackPayload('add:item:'.$second->id.':short', 22));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الذكر 2 من'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), $second->title)
+            && ! str_contains((string) ($request['text'] ?? ''), 'الذكر 2 من'));
 
         $this->process($this->telegramCallbackPayload('add:group:salawat', 23));
         Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:item:'.$items[0]->id)

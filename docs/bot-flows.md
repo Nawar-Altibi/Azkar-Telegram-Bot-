@@ -6,7 +6,7 @@ Language: Arabic, in a warm, simple Levantine tone. UI strings live in `lang/ar/
 
 | Command | Behavior |
 |---|---|
-| `/start` | New user: a three-line tutorial with `🚀 ابدأ الإعداد` and `💡 شو فكرة البوت؟`. A user already inside setup returns to the current step. A returning user sees a summary, today, help, and an explicit reset that asks for confirmation first. |
+| `/start` | New user: a three-line tutorial with `🚀 ابدأ الإعداد` and `💡 شو فكرة البوت؟`. A user already inside setup returns to the current step. A returning user sees a summary, today, help, and an explicit reset that asks for confirmation first. If the bottom keyboard is set to stay visible (the default), `/start` also sends it with a line that says it stays visible and can be hidden from settings. |
 | `/today` | The reading menu (see Reading). |
 | `/settings` | Summary plus one control per row (see Settings). |
 | `/help` | The help menu: one button per question. |
@@ -48,17 +48,17 @@ Rows: region, morning time, evening time, reminder style, follow-up, bottom keyb
 
 ## Reading
 
-`/today` greets by time of day (`App\Support\DayPeriod`, windows in `config('adhkar.day_windows')`) and puts the current period first, marked «⭐ وقتها هلق». At night, bedtime goes first. No choice is removed. Additional adhkar have their own keyboard button and are no longer in this menu.
+`/today` greets by time of day (`App\Support\DayPeriod`, windows in `config('adhkar.day_windows')`) and puts the current period first, colored blue (`style: primary`). At night, bedtime goes first. No choice is removed. Additional adhkar have their own keyboard button and are no longer in this menu.
 
 The first time the user opens morning or evening they pick short or full; the choice is remembered (`users.mode`, `users.mode_chosen_at`) and later readings open straight on the remembered wird. The first card has a switch button (`📖 بدّل للورد الكامل` or `🌿 بدّل للورد المختصر`) that also updates the remembered choice.
 
-Each card is one adhkar: header, `الذكر 3 من 9`, title, `🔁 التكرار`, the Arabic text, then virtue, source, and grade together in a blockquote (expandable when there is a virtue). The narrator and guidance notes are never shown, and titles carry no repetition counts. «التالي ⬅️» sits alone on the top row, «➡️ السابق» below it. Both edit the same message. The cursor is the callback: `rd:{logId}:{s|f|a}:{index}` for a reminder, `rt:{m|e|b|w|p}:{s|f|a}:{index}` for Today. On the last short card, `أكمل الورد الكامل` opens only the items that are in the full wird and not the short one.
+Each card is one adhkar: header, `الذكر 3 من 9`, title, `🔁 التكرار`, the Arabic text, then virtue, source, and grade. Virtue, source, and grade share an expandable blockquote. A source with no virtue is plain text, not a quote. Waking cards skip the item title and start at the dhikr. The narrator and guidance notes are never shown, and titles carry no repetition counts. «➡️ التالي» sits alone on the top row, «السابق ⬅️» below it. In the Arabic button the next arrow lands on the right and the previous arrow on the left. Both edit the same message. The cursor is the callback: `rd:{logId}:{s|f|a}:{index}` for a reminder, `rt:{m|e|b|w|p}:{s|f|a}:{index}` for Today. On the last short card, `أكمل الورد الكامل` opens only the items that are in the full wird and not the short one.
 
 `📥 أرسل الورد كاملًا` (`sv:…`) sends the wird pages as photos (an album, rendered from the PDF by `pdftoppm` and cached next to it), followed by `🖨 نسخة PDF للطباعة` (`sp:…`) which sends the PDF. Without `pdftoppm` (for example on a local machine) the PDF is sent directly. If the PDF fails too, the wird is sent as text messages.
 
 Bedtime, waking (3 adhkar), after-prayer (`after_prayer`, 8 adhkar from Hisn al-Muslim chapter 25, period code `p`) and the additional list (period code `z`, used for sending them all at once) are single-version collections, with no reminder, no Done button, and no short/full choice.
 
-🌟 Additional adhkar: one flat list, one button per dhikr (`add:item:{id}`). Each card shows «🌟 أذكار إضافية», «الذكر 3 من 8», previous/next, and «📋 كل الأذكار الإضافية» (`add:list`). Under the list, «📥 أرسل كل الأذكار الإضافية» (`sv:t:z:a`) sends them all at once, as page images with a printable PDF button, or as a PDF when page images are not available. Old `add:group:*`, `add:back` and `add:item:{id}:{group}` buttons still open the list or the card. The salawat formulas and their virtue are one item; the after-prayer tasbih moved to `after_prayer`.
+🌟 Additional adhkar: one flat list, one button per dhikr (`add:item:{id}`). The card is only that dhikr, with «📋 كل الأذكار الإضافية» (`add:list`) to return. Under the list, «📥 أرسل كل الأذكار الإضافية» (`sv:t:z:a`) sends them all at once, as page images with a printable PDF button, or as a PDF when page images are not available. Old `add:group:*` and `add:back` still open the list, and `add:item:{id}:{group}` still opens that one card. The salawat formulas and their virtue are one item; the after-prayer tasbih moved to `after_prayer`.
 
 ## Reminders
 
