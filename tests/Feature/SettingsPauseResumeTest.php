@@ -89,6 +89,77 @@ class SettingsPauseResumeTest extends TestCase
             && str_contains((string) ($request['text'] ?? ''), 'تم حفظ وقت الصباح'));
     }
 
+    public function test_pausing_from_settings_asks_first_and_offers_undo(): void
+    {
+        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramCallbackPayload('settings:pause_ask', 40));
+        $this->assertTrue($user->fresh()->reminders_enabled);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بدك توقف التذكيرات')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:pause_yes'));
+
+        $this->process($this->telegramCallbackPayload('settings:pause_yes', 41));
+        $this->assertFalse($user->fresh()->reminders_enabled);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'وقّفنا التذكيرات')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:resume'));
+
+        $this->process($this->telegramCallbackPayload('settings:resume', 42));
+        $this->assertTrue($user->fresh()->reminders_enabled);
+        $this->assertNotNull($user->fresh()->next_morning_at);
+    }
+
+    public function test_old_pause_button_asks_before_pausing(): void
+    {
+        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramMessagePayload('⏸ إيقاف التذكير', 43));
+        $this->assertTrue($user->fresh()->reminders_enabled);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'settings:pause_yes'));
+
+        $this->process($this->telegramCallbackPayload('settings:toggle_reminders', 44));
+        $this->assertTrue($user->fresh()->reminders_enabled);
+    }
+
+    public function test_keyboard_can_stay_visible_or_be_hidden(): void
+    {
+        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+        $this->assertTrue($user->fresh()->keyboard_persistent);
+
+        $this->process($this->telegramCallbackPayload('settings:keyboard', 50));
+        $this->assertFalse($user->fresh()->keyboard_persistent);
+        Http::assertSent(function ($request) {
+            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
+
+            return is_array($markup) && isset($markup['keyboard']) && ! isset($markup['is_persistent']);
+        });
+
+        $this->process($this->telegramCallbackPayload('settings:keyboard', 51));
+        $this->assertTrue($user->fresh()->keyboard_persistent);
+        Http::assertSent(function ($request) {
+            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
+
+            return is_array($markup)
+                && ($markup['is_persistent'] ?? false) === true
+                && ($markup['input_field_placeholder'] ?? '') === 'اختر من الأزرار 👇';
+        });
+    }
+
+    public function test_reset_asks_before_clearing_the_setup(): void
+    {
+        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramCallbackPayload('onb:reset', 60));
+        $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'onb:reset:yes'));
+
+        $this->process($this->telegramCallbackPayload('onb:reset:no', 61));
+        $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
+        $this->assertTrue($user->fresh()->reminders_enabled);
+
+        $this->process($this->telegramCallbackPayload('onb:reset:yes', 62));
+        $this->assertSame(OnboardingState::WaitingTimezone, $user->fresh()->onboarding_state);
+    }
+
     public function test_pause_before_onboarding_points_to_start(): void
     {
         User::factory()->newUser()->create([

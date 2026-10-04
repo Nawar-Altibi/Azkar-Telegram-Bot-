@@ -107,6 +107,8 @@ class BedtimeWakingTest extends TestCase
         // Telegram draws the first button on the left, so النوم (the first choice) sits on the right.
         $this->assertSame(['🌅 أذكار الاستيقاظ', '🌙 أذكار النوم'], array_column($keyboard['keyboard'][1], 'text'));
         $this->assertSame('⚙️ الإعدادات', $keyboard['keyboard'][2][1]['text']);
+        $this->assertSame('❓ المساعدة والشرح', $keyboard['keyboard'][2][0]['text']);
+        $this->assertCount(3, $keyboard['keyboard']);
     }
 
     public function test_bedtime_button_opens_the_first_card_immediately(): void

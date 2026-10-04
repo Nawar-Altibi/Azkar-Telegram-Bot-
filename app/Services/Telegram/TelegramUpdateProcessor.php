@@ -140,7 +140,7 @@ class TelegramUpdateProcessor
             'الإعدادات', '⚙️ الإعدادات' => 'settings',
             'إيقاف التذكير', '⏸ إيقاف التذكير' => 'pause',
             'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
-            'مساعدة', '❓ مساعدة' => 'help',
+            'مساعدة', '❓ مساعدة', 'المساعدة والشرح', '❓ المساعدة والشرح' => 'help',
             'شرح البوت', '🌿 شرح البوت' => 'explain',
             default => null,
         };
@@ -155,7 +155,7 @@ class TelegramUpdateProcessor
             'bedtime' => $this->startManualReading($user, 'b'),
             'waking' => $this->startManualReading($user, 'w'),
             'settings' => $this->sendSettings($user),
-            'pause' => $this->handlePause($user),
+            'pause' => $this->askPauseConfirmation($user),
             'resume' => $this->handleResume($user),
             'help' => $this->reply($user, __('bot.help'), $this->keyboards->mainReplyKeyboard($user)),
             'explain' => $this->sendResponse($user, $this->onboarding->explanation($user)),
@@ -396,7 +396,25 @@ class TelegramUpdateProcessor
 
         if ($data === 'onb:reset') {
             $this->safeAnswer($callbackId);
+            if ($user->onboarding_state === OnboardingState::Completed) {
+                $this->show($user, __('bot.reset_confirm'), $this->keyboards->resetConfirm(), $messageId);
+            } else {
+                $this->sendResponse($user, $this->onboarding->start($user), $messageId);
+            }
+
+            return;
+        }
+
+        if ($data === 'onb:reset:yes') {
+            $this->safeAnswer($callbackId);
             $this->sendResponse($user, $this->onboarding->reset($user), $messageId);
+
+            return;
+        }
+
+        if ($data === 'onb:reset:no') {
+            $this->safeAnswer($callbackId);
+            $this->sendResponse($user, $this->onboarding->start($user), $messageId);
 
             return;
         }
@@ -634,9 +652,27 @@ class TelegramUpdateProcessor
             return;
         }
 
-        if ($data === 'settings:toggle_reminders') {
-            $result = $this->settings->toggleReminders($user);
-            $this->replyPauseResume($user->fresh(), $result);
+        if ($data === 'settings:pause_ask'
+            || ($data === 'settings:toggle_reminders' && $user->reminders_enabled)) {
+            $this->askPauseConfirmation($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:pause_yes') {
+            $this->handlePause($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:resume' || $data === 'settings:toggle_reminders') {
+            $this->handleResume($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:keyboard') {
+            $this->toggleKeyboardPersistence($user, $messageId);
 
             return;
         }
@@ -1244,31 +1280,68 @@ class TelegramUpdateProcessor
         );
     }
 
-    private function handlePause(User $user): void
+    private function handlePause(User $user, ?int $messageId = null): void
     {
-        $this->replyPauseResume($user, $this->settings->pause($user));
+        $this->showPauseResume($user, $this->settings->pause($user), $messageId);
     }
 
-    private function handleResume(User $user): void
+    private function handleResume(User $user, ?int $messageId = null): void
     {
-        $this->replyPauseResume($user, $this->settings->resume($user));
+        $this->showPauseResume($user, $this->settings->resume($user), $messageId);
     }
 
-    private function replyPauseResume(User $user, string $result): void
+    private function askPauseConfirmation(User $user, ?int $messageId = null): void
+    {
+        if (! $user->isOnboarded()) {
+            $this->reply($user, __('bot.need_start'));
+
+            return;
+        }
+
+        if (! $user->reminders_enabled) {
+            $this->show($user, __('bot.already_paused'), $this->keyboards->settingsMenu($user), $messageId);
+
+            return;
+        }
+
+        $this->show($user, __('bot.pause_confirm'), $this->keyboards->pauseConfirm(), $messageId);
+    }
+
+    private function showPauseResume(User $user, string $result, ?int $messageId): void
     {
         $user = $user->fresh() ?? $user;
-        $text = match ($result) {
-            'paused' => __('bot.paused'),
-            'already_paused' => __('bot.already_paused'),
-            'resumed' => __('bot.resumed', [
+        if (! $user->isOnboarded()) {
+            $this->reply($user, __('bot.need_start'));
+
+            return;
+        }
+
+        [$text, $markup] = match ($result) {
+            'paused' => [__('bot.paused'), $this->keyboards->pausedUndo()],
+            'already_paused' => [__('bot.already_paused'), $this->keyboards->pausedUndo()],
+            'resumed' => [__('bot.resumed', [
                 'morning' => $user->formattedMorningTime() ?: '—',
                 'evening' => $user->formattedEveningTime() ?: '—',
-            ]),
-            'already_active' => __('bot.already_active'),
-            default => __('bot.need_start'),
+            ]), $this->keyboards->settingsMenu($user)],
+            'already_active' => [__('bot.already_active'), $this->keyboards->settingsMenu($user)],
+            default => [__('bot.need_start'), null],
         };
 
-        $this->reply($user, $text, $user->isOnboarded() ? $this->keyboards->mainReplyKeyboard($user) : null);
+        $this->show($user, $text, $markup, $messageId);
+    }
+
+    private function toggleKeyboardPersistence(User $user, ?int $messageId): void
+    {
+        $user->keyboard_persistent = ! ($user->keyboard_persistent ?? true);
+        $user->save();
+        $fresh = $user->fresh() ?? $user;
+
+        $this->sendSettings($fresh, $messageId);
+        $this->reply(
+            $fresh,
+            __($fresh->keyboard_persistent ? 'bot.keyboard_persistent_on' : 'bot.keyboard_persistent_off'),
+            $this->keyboards->mainReplyKeyboard($fresh),
+        );
     }
 
     /**

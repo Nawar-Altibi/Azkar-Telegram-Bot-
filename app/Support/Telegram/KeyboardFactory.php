@@ -157,7 +157,12 @@ class KeyboardFactory
      */
     public function settingsMenu(User $user): array
     {
-        $reminderLabel = $user->reminders_enabled ? '⏸ إيقاف التذكير' : '▶️ تفعيل التذكير';
+        $reminderButton = $user->reminders_enabled
+            ? ['text' => '⏸ إيقاف التذكيرات', 'callback_data' => 'settings:pause_ask']
+            : ['text' => '▶️ تشغيل التذكيرات', 'callback_data' => 'settings:resume'];
+        $keyboardButton = ($user->keyboard_persistent ?? true)
+            ? ['text' => '⌨️ الأزرار السفلية: ظاهرة دائمًا ✅', 'callback_data' => 'settings:keyboard']
+            : ['text' => '⌨️ الأزرار السفلية: أظهرها بنفسي', 'callback_data' => 'settings:keyboard'];
 
         return [
             'inline_keyboard' => [
@@ -166,7 +171,8 @@ class KeyboardFactory
                     ['text' => '🌅 وقت الصباح', 'callback_data' => 'settings:morning_time'],
                     ['text' => '🌙 وقت المساء', 'callback_data' => 'settings:evening_time'],
                 ]),
-                [['text' => $reminderLabel, 'callback_data' => 'settings:toggle_reminders']],
+                [$keyboardButton],
+                [$reminderButton],
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],
             ],
         ];
@@ -346,17 +352,59 @@ class KeyboardFactory
      */
     public function mainReplyKeyboard(User $user): array
     {
-        $pauseOrResume = $user->reminders_enabled ? '⏸ إيقاف التذكير' : '▶️ تفعيل التذكير';
-
-        return [
+        $keyboard = [
             'keyboard' => [
                 $this->rtl([['text' => '📖 أذكار اليوم'], ['text' => '🌟 أذكار إضافية']]),
                 $this->rtl([['text' => '🌙 أذكار النوم'], ['text' => '🌅 أذكار الاستيقاظ']]),
-                $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => $pauseOrResume]]),
-                [['text' => '❓ مساعدة']],
-                [['text' => '🌿 شرح البوت']],
+                $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => '❓ المساعدة والشرح']]),
             ],
             'resize_keyboard' => true,
+        ];
+
+        if ($user->keyboard_persistent ?? true) {
+            $keyboard['is_persistent'] = true;
+            $keyboard['input_field_placeholder'] = 'اختر من الأزرار 👇';
+        }
+
+        return $keyboard;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function pauseConfirm(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '⏸ نعم، أوقف التذكيرات', 'callback_data' => 'settings:pause_yes']],
+                [['text' => '↩️ لا، خليها شغّالة', 'callback_data' => 'settings:open']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function pausedUndo(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '↩️ تراجع، رجّع التذكيرات', 'callback_data' => 'settings:resume']],
+                [['text' => '⚙️ الإعدادات', 'callback_data' => 'settings:open']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resetConfirm(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '🔄 نعم، أعد الإعداد من البداية', 'callback_data' => 'onb:reset:yes']],
+                [['text' => '↩️ لا، خلّي إعداداتي', 'callback_data' => 'onb:reset:no']],
+            ],
         ];
     }
 

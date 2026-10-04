@@ -366,20 +366,17 @@ class ReminderReadingTest extends TestCase
         $this->assertSame($expected['content_snapshot_hash'], $log->fresh()->content_snapshot_hash);
     }
 
-    public function test_main_keyboard_puts_today_on_the_right_and_changes_with_pause(): void
+    public function test_main_keyboard_puts_today_on_the_right_and_offers_undo_after_pause(): void
     {
         $user = $this->user();
         $keyboard = app(\App\Support\Telegram\KeyboardFactory::class)->mainReplyKeyboard($user);
         $top = $keyboard['keyboard'][0];
         $this->assertSame('📖 أذكار اليوم', $top[array_key_last($top)]['text']);
+        $this->assertStringNotContainsString('إيقاف', json_encode($keyboard, JSON_UNESCAPED_UNICODE));
 
         app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('/pause', 70, 1001));
-        Http::assertSent(function ($request) {
-            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
-
-            return is_array($markup)
-                && str_contains(json_encode($markup, JSON_UNESCAPED_UNICODE), '▶️ تفعيل التذكير');
-        });
+        $this->assertFalse($user->fresh()->reminders_enabled);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'settings:resume'));
     }
 
     public function test_choosing_full_from_the_reminder_reads_the_full_wird_in_the_same_message(): void
