@@ -37,13 +37,11 @@ class OnboardingTest extends TestCase
 
             return str_contains($request->url(), 'sendMessage')
                 && str_contains($text, 'أهلاً بك في بوت الأذكار')
-                && str_contains($text, 'أذكار الصباح')
-                && str_contains($text, 'أذكار المساء')
-                && str_contains($text, 'ورد مختصر')
-                && str_contains($text, 'ورد كامل')
-                && str_contains($text, 'أذكار إضافية')
+                && str_contains($text, 'أذكار الصباح والمساء')
+                && substr_count($text, "\n") <= 3
                 && str_contains($markup, 'onb:begin')
                 && str_contains($markup, 'ابدأ الإعداد')
+                && str_contains($markup, 'help:topic:idea')
                 && ! str_contains($markup, 'nav:back');
         });
 
@@ -307,16 +305,66 @@ class OnboardingTest extends TestCase
             $text = (string) ($request['text'] ?? '');
             $markup = (string) ($request['reply_markup'] ?? '');
 
-            return str_contains($text, 'شرح البوت')
-                && str_contains($text, 'أذكار الصباح')
-                && str_contains($text, 'أذكار المساء')
+            return str_contains($text, 'فكرة البوت')
+                && str_contains($text, 'أذكار الصباح والمساء')
                 && str_contains($text, 'أذكار إضافية')
-                && ! str_contains($text, 'سنضبط معًا')
+                && str_contains($markup, 'help:menu')
                 && ! str_contains($markup, 'onb:begin');
         });
 
         $this->process($this->telegramCallbackPayload('guide:explain', 2));
         $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
+    }
+
+    public function test_help_lists_questions_and_answers_each_one(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramMessagePayload('❓ المساعدة والشرح', 1));
+        Http::assertSent(function ($request) {
+            $markup = (string) ($request['reply_markup'] ?? '');
+
+            return str_contains((string) ($request['text'] ?? ''), 'اختر سؤالك')
+                && str_contains($markup, 'help:topic:font')
+                && str_contains($markup, 'help:topic:missing')
+                && ! str_contains((string) ($request['text'] ?? ''), '/start');
+        });
+
+        $this->process($this->telegramCallbackPayload('help:topic:font', 2));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && str_contains((string) ($request['text'] ?? ''), 'حجم نص الرسائل')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'help:menu'));
+
+        $this->process($this->telegramCallbackPayload('help:topic:modes', 3));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'تقريبًا 5 دقائق'));
+
+        $this->process($this->telegramMessagePayload('❓ مساعدة', 4));
+        $this->process($this->telegramMessagePayload('/help', 5));
+        $this->assertSame(3, collect(Http::recorded())->filter(
+            fn ($pair) => str_contains((string) ($pair[0]['text'] ?? ''), 'اختر سؤالك')
+        )->count());
+    }
+
+    public function test_new_user_can_read_the_idea_before_setup(): void
+    {
+        $this->process($this->telegramMessagePayload('/start', 1));
+        $this->process($this->telegramCallbackPayload('help:topic:idea', 2));
+
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'فكرة البوت')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin'));
+        $this->assertSame(OnboardingState::New, User::query()->where('telegram_id', 1001)->first()->onboarding_state);
+    }
+
+    public function test_commands_are_registered_with_arabic_descriptions(): void
+    {
+        $this->artisan('telegram:commands:set')->assertSuccessful();
+
+        Http::assertSent(function ($request) {
+            $commands = json_decode((string) ($request['commands'] ?? ''), true);
+
+            return str_contains($request->url(), 'setMyCommands')
+                && collect($commands)->firstWhere('command', 'today')['description'] === 'أذكار اليوم';
+        });
     }
 
     public function test_start_during_onboarding_resumes_the_current_step(): void

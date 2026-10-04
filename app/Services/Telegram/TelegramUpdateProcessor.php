@@ -122,7 +122,7 @@ class TelegramUpdateProcessor
         match ($command) {
             '/start' => $this->sendResponse($user, $this->onboarding->start($user)),
             '/settings' => $this->sendSettings($user),
-            '/help' => $this->reply($user, __('bot.help'), $this->keyboards->mainReplyKeyboard($user)),
+            '/help' => $this->showHelpMenu($user, null),
             '/pause' => $this->handlePause($user),
             '/resume' => $this->handleResume($user),
             '/today' => $this->reply($user, __('bot.today_prompt'), $this->keyboards->todayMenu()),
@@ -157,8 +157,8 @@ class TelegramUpdateProcessor
             'settings' => $this->sendSettings($user),
             'pause' => $this->askPauseConfirmation($user),
             'resume' => $this->handleResume($user),
-            'help' => $this->reply($user, __('bot.help'), $this->keyboards->mainReplyKeyboard($user)),
-            'explain' => $this->sendResponse($user, $this->onboarding->explanation($user)),
+            'help' => $this->showHelpMenu($user, null),
+            'explain' => $this->showHelpTopic($user, 'idea', null),
         };
 
         return true;
@@ -421,7 +421,21 @@ class TelegramUpdateProcessor
 
         if ($data === 'guide:explain') {
             $this->safeAnswer($callbackId);
-            $this->sendResponse($user, $this->onboarding->explanation($user), $messageId);
+            $this->showHelpTopic($user, 'idea', $messageId);
+
+            return;
+        }
+
+        if ($data === 'help:menu') {
+            $this->safeAnswer($callbackId);
+            $this->showHelpMenu($user, $messageId);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'help:topic:')) {
+            $this->safeAnswer($callbackId);
+            $this->showHelpTopic($user, substr($data, strlen('help:topic:')), $messageId);
 
             return;
         }
@@ -1113,6 +1127,27 @@ class TelegramUpdateProcessor
             'phase' => 'a',
             'index' => 0,
         ], null);
+    }
+
+    private function showHelpMenu(User $user, ?int $messageId): void
+    {
+        $this->show($user, __('bot.help'), $this->keyboards->helpMenu(), $messageId);
+    }
+
+    private function showHelpTopic(User $user, string $key, ?int $messageId): void
+    {
+        $topics = __('bot.help_topics');
+        if (! isset($topics[$key])) {
+            $this->showHelpMenu($user, $messageId);
+
+            return;
+        }
+
+        $answer = __('bot.help_topics.'.$key.'.answer', [
+            'short' => __('bot.duration_short'),
+            'full' => __('bot.duration_full'),
+        ]);
+        $this->show($user, $answer, $this->keyboards->helpTopic($key, $user->isOnboarded()), $messageId);
     }
 
     private function showTodayMenu(User $user, ?int $messageId): void

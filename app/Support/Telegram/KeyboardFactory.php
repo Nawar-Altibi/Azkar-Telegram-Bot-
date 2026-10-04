@@ -13,10 +13,47 @@ class KeyboardFactory
     public function tutorialStart(): array
     {
         return [
-            'inline_keyboard' => [[
-                ['text' => '🚀 ابدأ الإعداد', 'callback_data' => 'onb:begin'],
-            ]],
+            'inline_keyboard' => [
+                [['text' => '🚀 ابدأ الإعداد', 'callback_data' => 'onb:begin']],
+                [['text' => '💡 شو فكرة البوت؟', 'callback_data' => 'help:topic:idea']],
+            ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function helpMenu(): array
+    {
+        $rows = [];
+        foreach (__('bot.help_topics') as $key => $topic) {
+            $rows[] = [['text' => $topic['label'], 'callback_data' => 'help:topic:'.$key]];
+        }
+
+        return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function helpTopic(string $key, bool $onboarded): array
+    {
+        $rows = [];
+        if (! $onboarded) {
+            $rows[] = [['text' => '🚀 ابدأ الإعداد', 'callback_data' => 'onb:begin']];
+        } else {
+            $action = match ($key) {
+                'read' => ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
+                'time', 'stop', 'missing' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
+                default => null,
+            };
+            if ($action !== null) {
+                $rows[] = [$action];
+            }
+        }
+        $rows[] = [['text' => __('bot.help_more'), 'callback_data' => 'help:menu']];
+
+        return ['inline_keyboard' => $rows];
     }
 
     /**
@@ -341,8 +378,8 @@ class KeyboardFactory
                     ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
                     ['text' => '⚙️ الإعدادات', 'callback_data' => 'settings:open'],
                 ]),
+                [['text' => '❓ المساعدة والشرح', 'callback_data' => 'help:menu']],
                 [['text' => '🔄 إعادة الإعداد', 'callback_data' => 'onb:reset']],
-                [['text' => '🌿 شرح البوت', 'callback_data' => 'guide:explain']],
             ],
         ];
     }

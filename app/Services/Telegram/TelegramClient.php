@@ -95,6 +95,17 @@ class TelegramClient
         ]);
     }
 
+    /**
+     * @param  array<int, array{command:string,description:string}>  $commands
+     */
+    public function setMyCommands(array $commands, ?string $languageCode = null): array
+    {
+        return $this->call('setMyCommands', array_filter([
+            'commands' => json_encode($commands, JSON_UNESCAPED_UNICODE),
+            'language_code' => $languageCode,
+        ]));
+    }
+
     public function deleteWebhook(): array
     {
         return $this->call('deleteWebhook', ['drop_pending_updates' => false]);

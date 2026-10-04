@@ -56,23 +56,6 @@ class OnboardingService
     }
 
     /**
-     * Reopens the guide without restarting setup.
-     *
-     * @return array{text:string,reply_markup:?array}
-     */
-    public function explanation(User $user): array
-    {
-        if ($user->onboarding_state === OnboardingState::New) {
-            return $this->tutorialScreen();
-        }
-
-        return [
-            'text' => __('bot.explain', ['body' => __('bot.explain_body')]),
-            'reply_markup' => $user->isOnboarded() ? $this->keyboards->mainReplyKeyboard($user) : null,
-        ];
-    }
-
-    /**
      * @return array{text:string,reply_markup:?array}
      */
     public function reset(User $user): array
@@ -262,7 +245,7 @@ class OnboardingService
     private function tutorialScreen(): array
     {
         return [
-            'text' => __('bot.tutorial', ['body' => __('bot.explain_body')]),
+            'text' => __('bot.tutorial'),
             'reply_markup' => $this->keyboards->tutorialStart(),
         ];
     }
