@@ -15,4 +15,8 @@ Schedule::command('adhkar:recover-stale')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+Schedule::command('adhkar:send-follow-ups')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 Schedule::command('bot:prune-events')->daily();

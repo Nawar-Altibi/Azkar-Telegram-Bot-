@@ -32,6 +32,7 @@ class CronTickService
     public function __construct(
         private readonly ReminderDispatchService $dispatcher,
         private readonly StaleRecoveryService $recovery,
+        private readonly FollowUpReminderService $followUps,
     ) {}
 
     /**
@@ -50,6 +51,7 @@ class CronTickService
             'stale_recovery_ran' => false,
             'stale_reminders_recovered' => 0,
             'stale_updates_recovered' => 0,
+            'follow_ups_sent' => 0,
             'skipped_locked' => false,
             'ok' => false,
         ];
@@ -81,6 +83,8 @@ class CronTickService
                     $metrics['stale_recovery_ran'] = true;
                     $metrics['stale_reminders_recovered'] = $recovered['reminders'];
                     $metrics['stale_updates_recovered'] = $recovered['updates'];
+                    // Rides on recovery's 5-minute cadence so idle ticks stay within their query budget.
+                    $metrics['follow_ups_sent'] = $this->followUps->sendDue();
                 }
             }
 

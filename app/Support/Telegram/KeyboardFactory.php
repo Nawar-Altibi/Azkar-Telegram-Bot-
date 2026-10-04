@@ -79,11 +79,44 @@ class KeyboardFactory
             $rows[] = $this->rtl($row);
         }
         $rows[] = [['text' => 'دولة أخرى', 'callback_data' => 'onb:tz:custom']];
+        $rows[] = [['text' => '📍 حدد بلدي من موقعي (اختياري)', 'callback_data' => 'onb:loc']];
         if ($includeBack) {
             $rows[] = $this->backOnlyRow();
         }
 
         return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * Telegram can only ask for a location from a bottom keyboard button.
+     *
+     * @return array<string, mixed>
+     */
+    public function locationRequest(): array
+    {
+        return [
+            'keyboard' => [
+                [['text' => '📍 أرسل موقعي', 'request_location' => true]],
+                [['text' => '🌍 بختار من القائمة']],
+            ],
+            'resize_keyboard' => true,
+            'one_time_keyboard' => true,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function locationConfirm(): array
+    {
+        return [
+            'inline_keyboard' => [
+                $this->rtl([
+                    ['text' => '✅ صح', 'callback_data' => 'loc:yes'],
+                    ['text' => '🌍 بختار بنفسي', 'callback_data' => 'loc:no'],
+                ]),
+            ],
+        ];
     }
 
     /**
@@ -212,6 +245,9 @@ class KeyboardFactory
         $styleButton = $user->sendsReadingWithReminder()
             ? ['text' => '🔔 التذكير: الأذكار بتوصل مباشرة', 'callback_data' => 'settings:style']
             : ['text' => '🔔 التذكير: رسالة تنبيه وبختار', 'callback_data' => 'settings:style'];
+        $followUpButton = $user->follow_up_enabled
+            ? ['text' => '🔁 تذكير تاني إذا نسيت: مشغّل ✅', 'callback_data' => 'settings:follow_up']
+            : ['text' => '🔁 تذكير تاني إذا نسيت: مطفي', 'callback_data' => 'settings:follow_up'];
 
         return [
             'inline_keyboard' => [
@@ -221,6 +257,7 @@ class KeyboardFactory
                     ['text' => '🌙 وقت المساء', 'callback_data' => 'settings:evening_time'],
                 ]),
                 [$styleButton],
+                [$followUpButton],
                 [$keyboardButton],
                 [$reminderButton],
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],
@@ -360,6 +397,21 @@ class KeyboardFactory
             'inline_keyboard' => [[
                 ['text' => '✅ تم', 'callback_data' => 'reminder:done:'.$reminderLogId],
             ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function followUp(int $reminderLogId, ?string $phase): array
+    {
+        $start = 'reminder:start:'.$reminderLogId.($phase !== null ? ':'.$phase : '');
+
+        return [
+            'inline_keyboard' => [
+                [['text' => '📖 يلا نقرأ', 'callback_data' => $start]],
+                [['text' => '🔕 لا تبعتلي تذكير تاني', 'callback_data' => 'settings:follow_up_off']],
+            ],
         ];
     }
 

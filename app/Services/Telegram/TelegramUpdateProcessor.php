@@ -20,6 +20,7 @@ use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
 use App\Support\DayPeriod;
 use App\Support\IntentMatcher;
+use App\Support\NearestTimezone;
 use App\Support\Telegram\KeyboardFactory;
 use App\Support\Telegram\TelegramUpdate as IncomingUpdate;
 use App\Support\Telegram\TelegramUser;
@@ -72,9 +73,90 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if ($update->message?->location !== null && str_ends_with((string) $user->awaiting_input, ':location')) {
+            $this->handleSharedLocation($user, $update->message->location['latitude'], $update->message->location['longitude']);
+
+            return;
+        }
+
         if ($update->message !== null) {
             $this->handleNonTextMessage($user, $update->message->kind);
         }
+    }
+
+    private function askForLocation(User $user, string $callbackId): void
+    {
+        $prefix = $user->onboarding_state === OnboardingState::Completed ? 'settings' : 'onboarding';
+        $user->awaiting_input = "{$prefix}:location";
+        $user->save();
+        $this->safeAnswer($callbackId);
+        $this->reply($user, __('bot.location_ask'), $this->keyboards->locationRequest());
+    }
+
+    /**
+     * Only the matched timezone is kept, briefly, until the user confirms; the coordinates are never stored.
+     */
+    private function handleSharedLocation(User $user, float $latitude, float $longitude): void
+    {
+        $timezone = NearestTimezone::find($latitude, $longitude);
+        $this->events->record($user, 'location_shared', ['found' => $timezone !== null]);
+        if ($timezone === null) {
+            $this->showTimezoneChoice($user, __('bot.location_failed'), null);
+
+            return;
+        }
+
+        Cache::put('location_tz:'.$user->id, $timezone, now()->addMinutes(30));
+        $this->reply($user, __('bot.location_confirm', [
+            'time' => ReminderScheduleCalculator::format12Hour(now($timezone)->format('H:i')),
+            'place' => e($this->timezoneLabel($timezone)),
+        ]), $this->keyboards->locationConfirm());
+    }
+
+    private function handleLocationAnswer(User $user, string $data, string $callbackId, ?int $messageId): void
+    {
+        $this->safeAnswer($callbackId);
+        $timezone = Cache::pull('location_tz:'.$user->id);
+
+        if ($data !== 'loc:yes') {
+            $this->showTimezoneChoice($user, __('bot.ask_timezone'), $messageId);
+
+            return;
+        }
+
+        if (! is_string($timezone) || ! str_ends_with((string) $user->awaiting_input, ':location')) {
+            $this->showTimezoneChoice($user, __('bot.location_expired'), $messageId);
+
+            return;
+        }
+
+        $label = $this->timezoneLabel($timezone);
+        $user->awaiting_input = null;
+        $user->save();
+
+        if ($user->onboarding_state === OnboardingState::Completed) {
+            $this->settings->updateTimezone($user, $timezone, $label);
+            $this->showSettingsSaved($user->fresh(), __('bot.timezone_saved', ['timezone' => e($label)]), $messageId);
+            $this->reply($user, __('bot.keyboard_restored'), $this->keyboards->mainReplyKeyboard($user->fresh() ?? $user));
+
+            return;
+        }
+
+        $this->sendOnboardingStep($user, $this->onboarding->handleTimezone($user, $timezone, $label), $messageId, 'timezone_location');
+    }
+
+    private function showTimezoneChoice(User $user, string $text, ?int $messageId): void
+    {
+        $fromSettings = $user->onboarding_state === OnboardingState::Completed;
+        $user->awaiting_input = null;
+        $user->save();
+        $this->show($user, $text, $this->keyboards->timezoneOptions($fromSettings), $messageId);
+    }
+
+    private function timezoneLabel(string $timezone): string
+    {
+        return TimezoneCatalog::labelForTimezone($timezone)
+            ?? str_replace('_', ' ', substr($timezone, (int) strrpos($timezone, '/') + 1));
     }
 
     private function handleNonTextMessage(User $user, string $kind): void
@@ -251,6 +333,7 @@ class TelegramUpdateProcessor
                 'onboarding:morning_time_confirm', 'settings:morning_time_confirm' => $this->handleCustomTime($user, $text, 'morning'),
                 'onboarding:evening_time_custom', 'settings:evening_time_custom',
                 'onboarding:evening_time_confirm', 'settings:evening_time_confirm' => $this->handleCustomTime($user, $text, 'evening'),
+                'onboarding:location', 'settings:location' => $this->showTimezoneChoice($user, __('bot.ask_timezone'), null),
                 default => $this->handleUnknownText($user, $text),
             };
         } catch (InvalidArgumentException) {
@@ -546,6 +629,18 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if ($data === 'onb:loc') {
+            $this->askForLocation($user, $callbackId);
+
+            return;
+        }
+
+        if ($data === 'loc:yes' || $data === 'loc:no') {
+            $this->handleLocationAnswer($user, $data, $callbackId, $messageId);
+
+            return;
+        }
+
         if (str_starts_with($data, 'onb:tzr:')) {
             $this->handleRegionCallback($user, $data, $callbackId, $messageId);
 
@@ -822,6 +917,24 @@ class TelegramUpdateProcessor
 
         if ($data === 'settings:keyboard') {
             $this->toggleKeyboardPersistence($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:follow_up') {
+            $user->follow_up_enabled = ! $user->follow_up_enabled;
+            $user->save();
+            $this->events->record($user, 'follow_up_setting', ['enabled' => $user->follow_up_enabled]);
+            $this->showSettingsSaved($user, __($user->follow_up_enabled ? 'bot.follow_up_on' : 'bot.follow_up_off'), $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:follow_up_off') {
+            $user->follow_up_enabled = false;
+            $user->save();
+            $this->events->record($user, 'follow_up_setting', ['enabled' => false, 'from' => 'message']);
+            $this->show($user, __('bot.follow_up_off'), null, $messageId);
 
             return;
         }
