@@ -95,7 +95,7 @@ class AdhkarContentServiceTest extends TestCase
         ]);
         $card = $service->renderCard('morning_short', $item, 3, 9, false);
 
-        $this->assertStringContainsString("الذكر 3 من 9", $card);
+        $this->assertStringContainsString('الذكر 3 من 9', $card);
         $this->assertStringContainsString('مختصر', $card);
         $this->assertStringNotContainsString('دقائق', $card);
         $this->assertStringNotContainsString('3. آية الكرسي', $card);
@@ -112,14 +112,20 @@ class AdhkarContentServiceTest extends TestCase
         $item = new AdhkarItem(['title' => 'ذكر', 'arabic_text' => 'نص']);
 
         $bedtime = $service->renderCard('bedtime', $item, 13, 13, true);
-        $this->assertStringStartsWith("🌙 أذكار النوم\n\nالذكر 13 من 13", $bedtime);
+        $this->assertStringStartsWith("🛌 أذكار النوم\n\nالذكر 13 من 13", $bedtime);
         $this->assertStringContainsString('انتهت أذكار النوم', $bedtime);
         $this->assertStringNotContainsString('مختصر', $bedtime);
 
         $waking = $service->renderCard('waking', $item, 1, 2, false);
-        $this->assertStringStartsWith("🌅 أذكار الاستيقاظ\n\nالذكر 1 من 2", $waking);
+        $this->assertStringStartsWith("☀️ أذكار الاستيقاظ\n\nالذكر 1 من 2", $waking);
+
+        $prayer = $service->renderCard('after_prayer', $item, 8, 8, true);
+        $this->assertStringStartsWith("🕌 أذكار بعد الصلاة\n\nالذكر 8 من 8", $prayer);
+        $this->assertStringContainsString('انتهت أذكار بعد الصلاة', $prayer);
+        $this->assertStringNotContainsString('مختصر', $prayer);
 
         $this->assertSame('أذكار النوم', $service->wirdTitle('bedtime'));
+        $this->assertSame('أذكار بعد الصلاة', $service->wirdTitle('after_prayer'));
         $this->assertSame('أذكار الاستيقاظ', $service->wirdTitle('waking'));
         $this->assertStringContainsString('انتهت أذكار الاستيقاظ', $service->footerText('waking'));
         $this->assertSame('أذكار الصباح — مختصر', $service->wirdTitle('morning_short'));
@@ -146,6 +152,8 @@ class AdhkarContentServiceTest extends TestCase
         $this->assertSame('evening_full', $service->manualBaseKey('e', 'a'));
         $this->assertSame('bedtime', $service->manualBaseKey('b', 'a'));
         $this->assertSame('waking', $service->manualBaseKey('w', 'a'));
+        $this->assertSame('after_prayer', $service->manualBaseKey('p', 'a'));
+        $this->assertNull($service->manualBaseKey('p', 's'));
         $this->assertNull($service->manualBaseKey('b', 's'));
         $this->assertNull($service->manualBaseKey('w', 'f'));
         $this->assertNull($service->manualBaseKey('x', 'a'));
@@ -180,6 +188,23 @@ class AdhkarContentServiceTest extends TestCase
             'hadith_number' => null,
             'hadith_grade' => null,
         ]);
-        $this->assertStringContainsString('<i>📚 صحيح البخاري</i>', app(AdhkarContentService::class)->formatItem($plain, 1));
+        $this->assertStringContainsString('<blockquote>📚 صحيح البخاري</blockquote>', app(AdhkarContentService::class)->formatItem($plain, 1));
+    }
+
+    public function test_card_never_shows_the_narrator_or_guidance_note(): void
+    {
+        $item = AdhkarItem::factory()->create([
+            'key' => 'card.narrator',
+            'arabic_text' => 'نص',
+            'narrator' => 'أبو هريرة رضي الله عنه',
+            'guidance_note' => 'ملاحظة توجيه',
+            'source_name' => 'صحيح البخاري',
+        ]);
+
+        $card = app(AdhkarContentService::class)->formatItem($item, 1);
+
+        $this->assertStringNotContainsString('أبو هريرة', $card);
+        $this->assertStringNotContainsString('الراوي', $card);
+        $this->assertStringNotContainsString('ملاحظة توجيه', $card);
     }
 }

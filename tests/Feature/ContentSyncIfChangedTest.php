@@ -128,6 +128,7 @@ class ContentSyncIfChangedTest extends TestCase
             database_path('data/adhkar/additional.php'),
             database_path('data/adhkar/bedtime.php'),
             database_path('data/adhkar/waking.php'),
+            database_path('data/adhkar/after_prayer.php'),
             $logic,
         ];
 

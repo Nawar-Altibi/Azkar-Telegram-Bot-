@@ -27,7 +27,8 @@ class ContentSyncServiceTest extends TestCase
         $this->assertTrue(AdhkarItem::query()->where('key', 'morning.01')->exists());
         $this->assertTrue(AdhkarItem::query()->where('key', 'additional.01')->exists());
         $this->assertSame(13, AdhkarCollection::query()->where('key', 'bedtime')->sole()->items()->count());
-        $this->assertSame(2, AdhkarCollection::query()->where('key', 'waking')->sole()->items()->count());
+        $this->assertSame(3, AdhkarCollection::query()->where('key', 'waking')->sole()->items()->count());
+        $this->assertSame(8, AdhkarCollection::query()->where('key', 'after_prayer')->sole()->items()->count());
 
         $short = AdhkarCollection::query()->where('key', 'morning_short')->first();
         $full = AdhkarCollection::query()->where('key', 'morning_full')->first();

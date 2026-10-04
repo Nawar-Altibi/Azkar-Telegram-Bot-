@@ -132,7 +132,7 @@ class ContentSyncService
     {
         return array_map(
             fn (string $file) => database_path("data/adhkar/{$file}.php"),
-            ['morning', 'evening', 'additional', 'bedtime', 'waking'],
+            ['morning', 'evening', 'additional', 'bedtime', 'waking', 'after_prayer'],
         );
     }
 
@@ -176,6 +176,7 @@ class ContentSyncService
             ['key' => 'additional', 'category' => 'additional', 'variant' => null, 'title' => 'أذكار وفضائل إضافية', 'order' => 5],
             ['key' => 'bedtime', 'category' => 'bedtime', 'variant' => null, 'title' => 'أذكار النوم', 'order' => 6],
             ['key' => 'waking', 'category' => 'waking', 'variant' => null, 'title' => 'أذكار الاستيقاظ', 'order' => 7],
+            ['key' => 'after_prayer', 'category' => 'after_prayer', 'variant' => null, 'title' => 'أذكار بعد الصلاة', 'order' => 8],
         ];
     }
 

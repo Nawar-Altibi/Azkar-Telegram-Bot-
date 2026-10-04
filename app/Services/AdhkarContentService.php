@@ -14,7 +14,7 @@ class AdhkarContentService
     /**
      * Manual collections read in one version only, keyed by their period code in rt:/sv:t: callbacks.
      */
-    private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking'];
+    private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking', 'p' => 'after_prayer'];
 
     public function resolveCollection(User $user, ReminderType $type): ?AdhkarCollection
     {
@@ -67,6 +67,7 @@ class AdhkarContentService
             str_starts_with($collectionKey, 'evening') => 'أذكار المساء',
             $collectionKey === 'bedtime' => 'أذكار النوم',
             $collectionKey === 'waking' => 'أذكار الاستيقاظ',
+            $collectionKey === 'after_prayer' => 'أذكار بعد الصلاة',
             default => 'الأذكار',
         };
     }
@@ -244,7 +245,7 @@ class AdhkarContentService
         $total = $items->count();
 
         foreach ($items as $index => $item) {
-            $block = "الذكر ".($index + 1)." من {$total}\n\n".$this->formatItem($item, $index + 1);
+            $block = 'الذكر '.($index + 1)." من {$total}\n\n".$this->formatItem($item, $index + 1);
             $candidate = $current."\n\n".$block;
             if (mb_strlen($candidate) > $limit && trim($current) !== '') {
                 $messages[] = trim($current);
@@ -262,10 +263,7 @@ class AdhkarContentService
         return $messages;
     }
 
-    /**
-     * @param  bool  $detailed  يُظهر الراوي وملاحظة التوجيه، ويُستخدم للذكر الإضافي المعروض منفردًا.
-     */
-    public function formatItem(AdhkarItem $item, int $number, bool $detailed = false): string
+    public function formatItem(AdhkarItem $item, int $number): string
     {
         $lines = [];
         $title = $item->title ?: "الذكر {$number}";
@@ -301,31 +299,20 @@ class AdhkarContentService
             $lines[] = $this->detailsBlock($details, filled($item->virtue));
         }
 
-        if ($detailed && filled($item->narrator)) {
-            $lines[] = '🗣️ الراوي: '.$this->escape($item->narrator);
-        }
-
-        if ($detailed && filled($item->guidance_note)) {
-            $lines[] = '📌 '.$this->escape($item->guidance_note);
-        }
-
         return implode("\n", $lines);
     }
 
     /**
-     * الفضل والمصدر يُطويان تحت نص الذكر في اقتباس ينفتح بالضغط، فيبقى الذكر نفسه أول ما يراه القارئ.
-     * المصدر وحده سطر قصير لا يحتاج طيًّا.
+     * الفضل والمصدر في اقتباس تحت نص الذكر، فيبقى الذكر نفسه أول ما يراه القارئ.
+     * ينطوي الاقتباس فقط إذا فيه فضل؛ المصدر وحده سطر قصير لا يحتاج طيًّا.
      *
      * @param  array<int, string>  $escapedLines
      */
     private function detailsBlock(array $escapedLines, bool $hasVirtue): string
     {
         $body = implode("\n", $escapedLines);
-        if (! $hasVirtue) {
-            return '<i>'.$body.'</i>';
-        }
 
-        return '<blockquote expandable>'.$body.'</blockquote>';
+        return ($hasVirtue ? '<blockquote expandable>' : '<blockquote>').$body.'</blockquote>';
     }
 
     private function escape(string $text): string
@@ -417,8 +404,11 @@ class AdhkarContentService
     private function sessionHeader(string $collectionKey): string
     {
         $icon = match (true) {
-            str_starts_with($collectionKey, 'morning'), $collectionKey === 'waking' => '🌅',
-            str_starts_with($collectionKey, 'evening'), $collectionKey === 'bedtime' => '🌙',
+            str_starts_with($collectionKey, 'morning') => '🌅',
+            str_starts_with($collectionKey, 'evening') => '🌙',
+            $collectionKey === 'waking' => '☀️',
+            $collectionKey === 'bedtime' => '🛌',
+            $collectionKey === 'after_prayer' => '🕌',
             default => '📖',
         };
         $title = $icon.' '.$this->collectionHeading($collectionKey);
@@ -437,7 +427,8 @@ class AdhkarContentService
             str_starts_with($key, 'morning') => "🌿 انتهت أذكار الصباح\n\nبارك الله في ذكرك",
             str_starts_with($key, 'evening') => "🌿 انتهت أذكار المساء\n\nبارك الله في ذكرك",
             $key === 'bedtime' => "🌙 انتهت أذكار النوم\n\nنومًا هانئًا، وبارك الله في ذكرك",
-            $key === 'waking' => "🌅 انتهت أذكار الاستيقاظ\n\nيومًا مباركًا، وبارك الله في ذكرك",
+            $key === 'waking' => "☀️ انتهت أذكار الاستيقاظ\n\nيومًا مباركًا، وبارك الله في ذكرك",
+            $key === 'after_prayer' => "🕌 انتهت أذكار بعد الصلاة\n\nتقبّل الله صلاتك وذكرك",
             default => 'هذه أذكار اختيارية، خذ منها ما تيسّر.',
         };
     }

@@ -9,4 +9,5 @@ enum AdhkarCategory: string
     case Additional = 'additional';
     case Bedtime = 'bedtime';
     case Waking = 'waking';
+    case AfterPrayer = 'after_prayer';
 }

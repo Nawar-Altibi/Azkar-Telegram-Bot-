@@ -12,7 +12,7 @@ return [
     [
         'key' => 'evening.salat_nabi',
         'category' => 'evening',
-        'title' => 'الصلاة على النبي ﷺ — 10 مرات',
+        'title' => 'الصلاة على النبي ﷺ',
         'arabic_text' => 'اللَّهُمَّ صَلِّ وَسَلِّمْ وَبَارِكْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ.',
         'repetitions_count' => 10,
         'repetitions_label' => '10 مرات',

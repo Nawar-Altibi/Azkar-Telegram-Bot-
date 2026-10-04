@@ -3,9 +3,9 @@
 /**
  * Structured representation of resources/adhkar/waking.md.
  * Adhkar for waking up from sleep, from Hisn al-Muslim, chapter «أذكار الاستيقاظ من النوم»
- * (e-quran.com/pages/hisnmuslim/athkar_alastygad_mn_alnwm.html; sunnah.com/hisn Hisn #1, #3).
- * «من تعار من الليل» (Hisn #2) and the night recitation of Aal-Imran 190–200 (Hisn #4) are
- * intentionally excluded: both are tied to waking during the night.
+ * (e-quran.com/pages/hisnmuslim/athkar_alastygad_mn_alnwm.html; sunnah.com/hisn Hisn #1, #2, #3).
+ * Includes «من تعار من الليل» (Hisn #2, Ibn Majah 3878 wording). The night recitation of
+ * Aal-Imran 190–200 (Hisn #4) is excluded.
  */
 return [
     [
@@ -44,6 +44,25 @@ return [
         'guidance_note' => null,
         'notes' => null,
         'order' => 2,
+        'collections' => ['waking'],
+    ],
+    [
+        'key' => 'waking.03',
+        'category' => 'waking',
+        'title' => 'لا إله إلا الله وحده لا شريك له',
+        'arabic_text' => 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ.\n\nرَبِّ اغْفِرْ لِي.',
+        'repetitions_count' => null,
+        'repetitions_label' => null,
+        'timing' => 'عند الاستيقاظ من النوم',
+        'virtue' => 'من قالها حين يستيقظ ثم دعا: «رب اغفر لي» غُفِر له، أو دعا استُجيب له، فإن قام فتوضأ ثم صلى قُبِلت صلاته.',
+        'source_text' => null,
+        'source_name' => 'سنن ابن ماجه 3878، وأصله في صحيح البخاري 1154؛ وصححه الألباني',
+        'hadith_number' => '3878',
+        'hadith_grade' => 'صحيح',
+        'narrator' => null,
+        'guidance_note' => null,
+        'notes' => 'حصن المسلم 2. لفظ ابن ماجه؛ وفي البخاري: «الحمد لله وسبحان الله… ثم قال: اللهم اغفر لي».',
+        'order' => 3,
         'collections' => ['waking'],
     ],
 ];
