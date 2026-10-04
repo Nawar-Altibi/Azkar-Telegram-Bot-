@@ -108,6 +108,19 @@ class LocationAndFollowUpTest extends TestCase
         $this->assertFalse($user->fresh()->follow_up_enabled);
     }
 
+    public function test_cron_tick_sends_follow_ups_together_with_stale_recovery(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
+        $user = $this->onboardedUser(['follow_up_enabled' => true]);
+        $this->sentLog($user, now()->subMinutes(70));
+        \Illuminate\Support\Facades\Cache::forget(\App\Services\StaleRecoveryService::MARKER_KEY);
+
+        $metrics = app(\App\Services\CronTickService::class)->run();
+
+        $this->assertTrue($metrics['stale_recovery_ran']);
+        $this->assertSame(1, $metrics['follow_ups_sent']);
+    }
+
     public function test_no_follow_up_when_off_too_early_already_used_or_the_period_passed(): void
     {
         $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
