@@ -151,4 +151,35 @@ class AdhkarContentServiceTest extends TestCase
         $this->assertNull($service->manualBaseKey('x', 'a'));
         $this->assertNull($service->manualBaseKey('m', 'z'));
     }
+
+    public function test_card_keeps_the_text_as_is_and_folds_virtue_and_source_together(): void
+    {
+        $text = 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ';
+        $item = AdhkarItem::factory()->create([
+            'key' => 'card.virtue',
+            'title' => 'التسبيح',
+            'arabic_text' => $text,
+            'repetitions_label' => '100 مرة',
+            'virtue' => 'حُطّت خطاياه',
+            'source_name' => 'صحيح مسلم',
+            'hadith_number' => '2691',
+            'hadith_grade' => null,
+        ]);
+
+        $card = app(AdhkarContentService::class)->formatItem($item, 1);
+
+        $this->assertStringContainsString("\n\n".$text."\n\n", $card);
+        $this->assertStringContainsString('🔁 <b>التكرار: 100 مرة</b>', $card);
+        $this->assertMatchesRegularExpression('/<blockquote expandable>💡 الفضل: .*\n📚 صحيح مسلم · 2691<\/blockquote>/u', $card);
+
+        $plain = AdhkarItem::factory()->create([
+            'key' => 'card.source',
+            'arabic_text' => $text,
+            'virtue' => null,
+            'source_name' => 'صحيح البخاري',
+            'hadith_number' => null,
+            'hadith_grade' => null,
+        ]);
+        $this->assertStringContainsString('<i>📚 صحيح البخاري</i>', app(AdhkarContentService::class)->formatItem($plain, 1));
+    }
 }

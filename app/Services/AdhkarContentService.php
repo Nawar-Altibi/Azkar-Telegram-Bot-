@@ -272,15 +272,15 @@ class AdhkarContentService
         $lines[] = '<b>'.$this->escape($title).'</b>';
 
         if (filled($item->repetitions_label)) {
-            $lines[] = '🔁 التكرار: '.$this->escape($item->repetitions_label);
+            $lines[] = '🔁 <b>التكرار: '.$this->escape($item->repetitions_label).'</b>';
         }
 
         $lines[] = '';
         $lines[] = $this->escape((string) $item->arabic_text);
 
+        $details = [];
         if (filled($item->virtue)) {
-            $lines[] = '';
-            $lines[] = $this->blockquote('💡 الفضل: '.$item->virtue);
+            $details[] = '💡 الفضل: '.$this->escape((string) $item->virtue);
         }
 
         if (filled($item->source_name)) {
@@ -289,11 +289,16 @@ class AdhkarContentService
             if ($number !== '' && ! str_contains($source, $number)) {
                 $source .= ' · '.$number;
             }
-            $lines[] = '<i>📚 '.$this->escape($source).'</i>';
+            $details[] = '📚 '.$this->escape($source);
         }
 
         if (filled($item->hadith_grade)) {
-            $lines[] = '✅ '.$this->escape((string) $item->hadith_grade);
+            $details[] = '✅ '.$this->escape((string) $item->hadith_grade);
+        }
+
+        if ($details !== []) {
+            $lines[] = '';
+            $lines[] = $this->detailsBlock($details, filled($item->virtue));
         }
 
         if ($detailed && filled($item->narrator)) {
@@ -308,13 +313,19 @@ class AdhkarContentService
     }
 
     /**
-     * الفضل الطويل يُطوى في اقتباس قابل للتوسعة حتى لا تطول الرسالة على القارئ.
+     * الفضل والمصدر يُطويان تحت نص الذكر في اقتباس ينفتح بالضغط، فيبقى الذكر نفسه أول ما يراه القارئ.
+     * المصدر وحده سطر قصير لا يحتاج طيًّا.
+     *
+     * @param  array<int, string>  $escapedLines
      */
-    private function blockquote(string $text): string
+    private function detailsBlock(array $escapedLines, bool $hasVirtue): string
     {
-        $expandable = mb_strlen($text) > 200 ? ' expandable' : '';
+        $body = implode("\n", $escapedLines);
+        if (! $hasVirtue) {
+            return '<i>'.$body.'</i>';
+        }
 
-        return '<blockquote'.$expandable.'>'.$this->escape($text).'</blockquote>';
+        return '<blockquote expandable>'.$body.'</blockquote>';
     }
 
     private function escape(string $text): string

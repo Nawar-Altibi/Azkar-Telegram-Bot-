@@ -48,6 +48,21 @@ class FriendlyRepliesTest extends TestCase
             && str_contains((string) ($request['reply_markup'] ?? ''), '"keyboard"'));
     }
 
+    public function test_plain_words_open_the_right_screen_and_settings_changes_ask_first(): void
+    {
+        $user = User::query()->where('telegram_id', 1001)->first();
+
+        app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('وقّف التذكير', 1));
+        $this->assertTrue($user->fresh()->reminders_enabled);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'settings:pause_yes'));
+
+        app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('شكرًا', 2));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'جزاك الله خيرًا'));
+
+        app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('بطاطا', 3));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما فهمت «بطاطا»'));
+    }
+
     public function test_an_old_button_explains_itself_and_brings_the_new_keyboard(): void
     {
         app(TelegramUpdateProcessor::class)->handle($this->telegramCallbackPayload('legacy:thing', 2));

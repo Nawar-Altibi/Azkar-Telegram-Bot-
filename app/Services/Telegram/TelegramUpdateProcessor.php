@@ -18,6 +18,7 @@ use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
 use App\Support\DayPeriod;
+use App\Support\IntentMatcher;
 use App\Support\Telegram\KeyboardFactory;
 use App\Support\Telegram\TelegramUpdate as IncomingUpdate;
 use App\Support\Telegram\TelegramUser;
@@ -203,7 +204,36 @@ class TelegramUpdateProcessor
             return;
         }
 
+        $intent = IntentMatcher::match($text);
+        if ($intent !== null) {
+            $this->handleIntent($user, $intent);
+
+            return;
+        }
+
         $this->reply($user, __('bot.unknown_text', ['input' => $input]), $this->keyboards->mainReplyKeyboard($user));
+    }
+
+    /**
+     * Anything that changes a setting only opens its confirmation; the user still taps to apply it.
+     */
+    private function handleIntent(User $user, string $intent): void
+    {
+        match ($intent) {
+            'morning' => $this->openPeriod($user, ReminderType::Morning, null),
+            'evening' => $this->openPeriod($user, ReminderType::Evening, null),
+            'bedtime' => $this->startManualReading($user, 'b'),
+            'waking' => $this->startManualReading($user, 'w'),
+            'time', 'settings' => $this->sendSettings($user),
+            'help' => $this->showHelpMenu($user, null),
+            'pause' => $this->askPauseConfirmation($user),
+            'resume' => $user->reminders_enabled
+                ? $this->reply($user, __('bot.already_active'), $this->keyboards->mainReplyKeyboard($user))
+                : $this->reply($user, __('bot.resume_confirm'), $this->keyboards->resumeConfirm()),
+            'thanks' => $this->reply($user, __('bot.thanks_reply'), $this->keyboards->mainReplyKeyboard($user)),
+            'salam' => $this->reply($user, __('bot.salam_reply'), $this->keyboards->mainReplyKeyboard($user)),
+            default => $this->reply($user, __('bot.greeting_reply'), $this->keyboards->mainReplyKeyboard($user)),
+        };
     }
 
     private function handleAwaitingInput(User $user, string $text): void
@@ -526,18 +556,8 @@ class TelegramUpdateProcessor
         }
 
         if ($data === 'today:morning' || $data === 'today:evening') {
-            $type = $data === 'today:morning' ? ReminderType::Morning : ReminderType::Evening;
-            $period = $type === ReminderType::Evening ? 'e' : 'm';
             $this->safeAnswer($callbackId);
-
-            $remembered = $user->rememberedMode();
-            if ($remembered !== null) {
-                $this->startPeriodReading($user, $period, $remembered, $messageId);
-
-                return;
-            }
-
-            $this->show($user, $this->content->modeChoiceText($type), $this->keyboards->modeChoice($period), $messageId);
+            $this->openPeriod($user, $data === 'today:morning' ? ReminderType::Morning : ReminderType::Evening, $messageId);
 
             return;
         }
@@ -1229,6 +1249,22 @@ class TelegramUpdateProcessor
             'phase' => 'a',
             'index' => 0,
         ], $messageId);
+    }
+
+    /**
+     * Opens straight on the remembered wird, or asks short or full the first time.
+     */
+    private function openPeriod(User $user, ReminderType $type, ?int $messageId): void
+    {
+        $period = $type === ReminderType::Evening ? 'e' : 'm';
+        $remembered = $user->rememberedMode();
+        if ($remembered !== null) {
+            $this->startPeriodReading($user, $period, $remembered, $messageId);
+
+            return;
+        }
+
+        $this->show($user, $this->content->modeChoiceText($type), $this->keyboards->modeChoice($period), $messageId);
     }
 
     private function startPeriodReading(User $user, string $period, AdhkarMode $mode, ?int $messageId): void

@@ -452,6 +452,19 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
+    public function resumeConfirm(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '▶️ إي، رجّع التذكيرات', 'callback_data' => 'settings:resume']],
+                [['text' => '↩️ لا، خليها موقوفة', 'callback_data' => 'settings:open']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function pausedUndo(): array
     {
         return [
