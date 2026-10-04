@@ -113,7 +113,7 @@ class OnboardingTest extends TestCase
             $text = (string) ($request['text'] ?? '');
             $markup = (string) ($request['reply_markup'] ?? '');
 
-            return str_contains($text, 'الفاصل بين الساعة والدقائق غير صحيح')
+            return str_contains($text, 'بين الساعة والدقائق حط نقطتين')
                 && str_contains($text, "كتبت:\n\u{200E}7;42\n")
                 && str_contains($markup, 'onb:time:morning:0742')
                 && str_contains($markup, 'nav:cancel');
@@ -121,16 +121,16 @@ class OnboardingTest extends TestCase
         $this->assertSame('06:00:00', $user->fresh()->morning_time);
 
         $this->process($this->telegramMessagePayload('7:090', 2));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الدقائق تُكتب برقمين'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الدقائق بتنكتب برقمين'));
 
         $this->process($this->telegramMessagePayload('25:00', 3));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الساعة غير صحيحة'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الساعة لازم تكون رقم من 1 إلى 12'));
 
         $this->process($this->telegramMessagePayload('<b>صباحًا</b>', 4));
         Http::assertSent(function ($request) {
             $text = (string) ($request['text'] ?? '');
 
-            return str_contains($text, 'ليس وقتًا') && str_contains($text, '&lt;b&gt;');
+            return str_contains($text, 'ما فيه ساعة') && str_contains($text, '&lt;b&gt;');
         });
 
         $this->process($this->telegramCallbackPayload('onb:time:morning:0742', 5));
@@ -183,8 +183,9 @@ class OnboardingTest extends TestCase
         $user = User::query()->where('telegram_id', 1001)->first();
         $this->assertSame(OnboardingState::WaitingMorningTime, $user->onboarding_state);
         $this->assertNull($user->morning_time);
-        Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', '05:30'));
+        Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', '5:30 صباحًا'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'HH:MM'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), '24 ساعة'));
     }
 
     public function test_america_asks_for_a_region_before_saving(): void
@@ -235,7 +236,7 @@ class OnboardingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($markup, 'nav:back')
-                && str_contains((string) ($request['text'] ?? ''), '05:30')
+                && str_contains((string) ($request['text'] ?? ''), '6 ونص الصبح')
                 && ! str_contains($markup, 'nav:cancel');
         });
     }

@@ -80,13 +80,26 @@ class ReminderScheduleCalculator
 
         $hour = (int) $matches[1];
         $minute = $matches[2];
-        $period = $hour < 12 ? 'ص' : 'م';
         $hour12 = $hour % 12;
         if ($hour12 === 0) {
             $hour12 = 12;
         }
 
-        return $hour12.':'.$minute.' '.$period;
+        return $hour12.':'.$minute.' '.self::periodWord($hour);
+    }
+
+    /**
+     * The part of the day people say aloud: 4:00 عصرًا rather than 4:00 م.
+     */
+    public static function periodWord(int $hour): string
+    {
+        return match (true) {
+            $hour < 4 => 'ليلًا',
+            $hour < 12 => 'صباحًا',
+            $hour < 15 => 'ظهرًا',
+            $hour < 18 => 'عصرًا',
+            default => 'مساءً',
+        };
     }
 
     /**
@@ -99,32 +112,103 @@ class ReminderScheduleCalculator
             throw new InvalidTimeException(InvalidTimeException::EMPTY);
         }
         $localTime = str_replace(['.', '٫'], ':', $localTime);
-        $localTime = preg_replace('/\s+/u', ' ', $localTime) ?? $localTime;
+        $localTime = preg_replace(['/[\x{064B}-\x{0652}\x{0640}]/u', '/\s+/u'], ['', ' '], $localTime) ?? $localTime;
 
-        $suffix = null;
-        if (preg_match('/(?:\s*)(صباحاً|صباحا|مساءً|مساء|صباح|am|pm|ص|م)\s*$/iu', $localTime, $suffixMatch) === 1) {
-            $suffix = self::suffixPeriod($suffixMatch[1]);
-            $localTime = trim(mb_substr($localTime, 0, mb_strlen($localTime) - mb_strlen($suffixMatch[1])));
+        ['text' => $localTime, 'suffix' => $suffix, 'fraction' => $fraction] = self::extractSpokenParts($localTime);
+        if ($localTime === '' && ($suffix !== null || $fraction !== null)) {
+            throw new InvalidTimeException(InvalidTimeException::LETTERS);
         }
 
         if (preg_match('/^([01]?\d|2[0-3])(?::([0-5]\d)(?::([0-5]\d))?)?$/', $localTime, $matches) !== 1) {
             throw self::diagnose($localTime, $suffix);
         }
 
-        $minute = $matches[2] ?? null;
-        if ($minute === null && $suffix === null) {
-            throw new InvalidTimeException(
-                InvalidTimeException::MISSING_MINUTES,
-                sprintf('%02d:00', (int) $matches[1]),
-            );
+        $hour = (int) $matches[1];
+        $minute = (int) ($matches[2] ?? 0);
+        if ($fraction !== null && ! isset($matches[2])) {
+            $minute = $fraction['minute'];
+            if ($fraction['before']) {
+                $hour = $hour === 0 ? 23 : $hour - 1;
+            }
         }
 
         return [
-            'hour' => (int) $matches[1],
-            'minute' => (int) ($minute ?? 0),
+            'hour' => $hour,
+            'minute' => $minute,
             'second' => (int) ($matches[3] ?? 0),
             'suffix' => $suffix,
         ];
+    }
+
+    /**
+     * Pulls the spoken parts out of a typed time: الصبح/المسا and similar words, ونص/وربع/إلا ربع,
+     * and the word الساعة. What remains should be digits only.
+     *
+     * @return array{text:string,suffix:?string,fraction:?array{minute:int,before:bool}}
+     */
+    private static function extractSpokenParts(string $value): array
+    {
+        $value = preg_replace('/(?:^|\s)(?:ال)?ساعة(?=\s|$)/u', ' ', $value) ?? $value;
+
+        $fraction = null;
+        if (preg_match('/(?:^|\s)(?:إلا|الا|إلّا)\s*(ربع|الربع|ثلث|الثلث)(?=\s|$)/u', $value, $match) === 1) {
+            $fraction = ['minute' => str_contains($match[1], 'ربع') ? 45 : 40, 'before' => true];
+            $value = str_replace($match[0], ' ', $value);
+        } elseif (preg_match('/(?:^|\s)و\s*(نص|نصف|النص|ربع|الربع|ثلث|الثلث)(?=\s|$)/u', $value, $match) === 1) {
+            $fraction = [
+                'minute' => match (true) {
+                    str_contains($match[1], 'ربع') => 15,
+                    str_contains($match[1], 'ثلث') => 20,
+                    default => 30,
+                },
+                'before' => false,
+            ];
+            $value = str_replace($match[0], ' ', $value);
+        }
+
+        $suffix = null;
+        $kept = [];
+        foreach (preg_split('/\s+/u', trim($value)) ?: [] as $token) {
+            $period = self::periodForWord($token);
+            if ($period !== null && $suffix === null) {
+                $suffix = $period;
+
+                continue;
+            }
+            $kept[] = $token;
+        }
+        $value = implode(' ', $kept);
+
+        // A suffix written against the digits, as in 8م or 8:30ص.
+        if ($suffix === null && preg_match('/^(.*\d)\s*(ص|م|am|pm)$/iu', $value, $match) === 1) {
+            $suffix = self::suffixPeriod($match[2]);
+            $value = $match[1];
+        }
+
+        return ['text' => trim($value), 'suffix' => $suffix, 'fraction' => $fraction];
+    }
+
+    private static function periodForWord(string $token): ?string
+    {
+        $token = mb_strtolower(trim($token));
+        $candidates = [$token, preg_replace('/ا$/u', '', $token) ?? $token];
+
+        $morning = ['ص', 'am', 'صباح', 'الصباح', 'صبح', 'الصبح', 'بالصبح', 'فجر', 'الفجر'];
+        $evening = [
+            'م', 'pm', 'مساء', 'المساء', 'مسا', 'المسا', 'بالمسا', 'ليل', 'الليل', 'بالليل', 'ليلا',
+            'عصر', 'العصر', 'بالعصر', 'مغرب', 'المغرب', 'عشا', 'العشا', 'العشاء', 'ضهر', 'الضهر', 'ظهر', 'الظهر', 'بالضهر',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $morning, true)) {
+                return 'am';
+            }
+            if (in_array($candidate, $evening, true)) {
+                return 'pm';
+            }
+        }
+
+        return null;
     }
 
     /**

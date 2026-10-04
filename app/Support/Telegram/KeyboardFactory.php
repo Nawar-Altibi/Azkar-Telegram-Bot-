@@ -3,6 +3,7 @@
 namespace App\Support\Telegram;
 
 use App\Models\User;
+use App\Services\ReminderScheduleCalculator;
 
 class KeyboardFactory
 {
@@ -80,10 +81,10 @@ class KeyboardFactory
         foreach ($presets as $time) {
             $encoded = str_replace(':', '', $time);
             $row[] = [
-                'text' => $time,
+                'text' => ReminderScheduleCalculator::format12Hour($time),
                 'callback_data' => "onb:time:{$kind}:{$encoded}",
             ];
-            if (count($row) === 3) {
+            if (count($row) === 2) {
                 $rows[] = $this->rtl($row);
                 $row = [];
             }
@@ -91,7 +92,7 @@ class KeyboardFactory
         if ($row !== []) {
             $rows[] = $this->rtl($row);
         }
-        $rows[] = [['text' => '⏰ وقت آخر', 'callback_data' => "onb:time:{$kind}:custom"]];
+        $rows[] = [['text' => '⏰ وقت آخر (أكتبه بنفسي)', 'callback_data' => "onb:time:{$kind}:custom"]];
         $rows[] = $this->backOnlyRow();
 
         return ['inline_keyboard' => $rows];
@@ -105,8 +106,9 @@ class KeyboardFactory
     {
         $row = [];
         foreach ($options as $option) {
+            $hour = (int) substr($option['hm'], 0, 2);
             $row[] = [
-                'text' => $option['label'],
+                'text' => ($hour >= 4 && $hour < 18 ? '☀️ ' : '🌙 ').$option['label'],
                 'callback_data' => "onb:time:{$kind}:{$option['hm']}",
             ];
         }

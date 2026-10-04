@@ -63,7 +63,6 @@ class ReminderScheduleCalculatorTest extends TestCase
             'comma' => ['18,30', InvalidTimeException::BAD_SEPARATOR, '18:30'],
             'comma with three-digit minutes' => ['7,090', InvalidTimeException::BAD_SEPARATOR, null],
             'no separator' => ['0730', InvalidTimeException::BAD_SEPARATOR, '07:30'],
-            'bare hour' => ['7', InvalidTimeException::MISSING_MINUTES, '07:00'],
             'trailing colon' => ['7:', InvalidTimeException::MISSING_MINUTES, '07:00'],
             'hour too large' => ['25:00', InvalidTimeException::HOUR_RANGE, null],
             'bare hour too large' => ['30', InvalidTimeException::HOUR_RANGE, null],
@@ -107,10 +106,49 @@ class ReminderScheduleCalculatorTest extends TestCase
         $this->assertSame('12:00:00', ReminderScheduleCalculator::normalizeTime('12 م'));
         $this->assertSame('15:00:00', ReminderScheduleCalculator::normalizeTime('3:00 pm'));
 
-        $this->assertSame('12:30 ص', ReminderScheduleCalculator::format12Hour('00:30:00'));
-        $this->assertSame('8:00 ص', ReminderScheduleCalculator::format12Hour('08:00:00'));
-        $this->assertSame('12:01 م', ReminderScheduleCalculator::format12Hour('12:01:00'));
-        $this->assertSame('8:00 م', ReminderScheduleCalculator::format12Hour('20:00:00'));
+        $this->assertSame('12:30 ليلًا', ReminderScheduleCalculator::format12Hour('00:30:00'));
+        $this->assertSame('8:00 صباحًا', ReminderScheduleCalculator::format12Hour('08:00:00'));
+        $this->assertSame('12:01 ظهرًا', ReminderScheduleCalculator::format12Hour('12:01:00'));
+        $this->assertSame('4:00 عصرًا', ReminderScheduleCalculator::format12Hour('16:00:00'));
+        $this->assertSame('8:00 مساءً', ReminderScheduleCalculator::format12Hour('20:00:00'));
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function spokenTimes(): array
+    {
+        return [
+            'bare hour' => ['7', 'morning', '07:00:00'],
+            'evening word' => ['8 المسا', 'evening', '20:00:00'],
+            'at night' => ['8 بالليل', 'evening', '20:00:00'],
+            'half past in the morning' => ['6 ونص الصبح', 'morning', '06:30:00'],
+            'quarter to' => ['8 إلا ربع الصبح', 'morning', '07:45:00'],
+            'quarter past' => ['7 وربع المسا', 'evening', '19:15:00'],
+            'afternoon' => ['5 العصر', 'evening', '17:00:00'],
+            'noon' => ['12 الضهر', 'morning', '12:00:00'],
+            'with the word hour' => ['الساعة 6 المسا', 'evening', '18:00:00'],
+            'twelve hour label' => ['5:30 صباحًا', 'morning', '05:30:00'],
+            'attached suffix' => ['8م', 'evening', '20:00:00'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('spokenTimes')]
+    public function test_it_understands_times_written_the_way_people_say_them(string $input, string $kind, string $expected): void
+    {
+        $result = ReminderScheduleCalculator::classifyTime($input, $kind);
+
+        $this->assertSame('save', $result['action']);
+        $this->assertSame($expected, $result['time']);
+    }
+
+    public function test_a_bare_hour_in_the_evening_asks_morning_or_evening(): void
+    {
+        $result = ReminderScheduleCalculator::classifyTime('8', 'evening');
+
+        $this->assertSame('confirm', $result['action']);
+        $this->assertSame('8:00 صباحًا', $result['options'][0]['label']);
+        $this->assertSame('8:00 مساءً', $result['options'][1]['label']);
     }
 
     public function test_it_asks_before_saving_an_ambiguous_evening_or_noon_time(): void
@@ -119,8 +157,8 @@ class ReminderScheduleCalculatorTest extends TestCase
         $this->assertSame('confirm', $evening['action']);
         $this->assertSame('08:00:00', $evening['options'][0]['time']);
         $this->assertSame('20:00:00', $evening['options'][1]['time']);
-        $this->assertSame('8:00 ص', $evening['options'][0]['label']);
-        $this->assertSame('8:00 م', $evening['options'][1]['label']);
+        $this->assertSame('8:00 صباحًا', $evening['options'][0]['label']);
+        $this->assertSame('8:00 مساءً', $evening['options'][1]['label']);
 
         $noon = ReminderScheduleCalculator::classifyTime('12:01', 'morning');
         $this->assertSame('confirm', $noon['action']);

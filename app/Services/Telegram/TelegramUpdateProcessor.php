@@ -276,7 +276,7 @@ class TelegramUpdateProcessor
     {
         $message = __('bot.'.$exception->reason, [
             'input' => $exception->reason === InvalidTimeException::LETTERS ? $this->quote($text) : $this->quoteLtr($text),
-            'example' => $kind === 'evening' ? '18:30' : '05:30',
+            'example' => $kind === 'evening' ? '6:30 مساءً' : '5:30 صباحًا',
         ]);
         $markup = $this->navigationKeyboard($fromSettings);
 
@@ -307,7 +307,7 @@ class TelegramUpdateProcessor
         $hm = substr($classified['time'], 0, 5);
 
         return [[
-            'label' => __('bot.time_suggestion_button', ['time' => $hm]),
+            'label' => __('bot.time_suggestion_button', ['time' => ReminderScheduleCalculator::format12Hour($classified['time'])]),
             'hm' => str_replace(':', '', $hm),
         ]];
     }

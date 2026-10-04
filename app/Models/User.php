@@ -26,7 +26,11 @@ class User extends Model
         'morning_time',
         'evening_time',
         'mode',
+        'mode_chosen_at',
         'reminders_enabled',
+        'keyboard_persistent',
+        'reminder_style',
+        'follow_up_enabled',
         'onboarding_state',
         'awaiting_input',
         'next_morning_at',
@@ -41,7 +45,10 @@ class User extends Model
             'telegram_id' => 'integer',
             'chat_id' => 'integer',
             'reminders_enabled' => 'boolean',
+            'keyboard_persistent' => 'boolean',
+            'follow_up_enabled' => 'boolean',
             'mode' => AdhkarMode::class,
+            'mode_chosen_at' => 'datetime',
             'onboarding_state' => OnboardingState::class,
             'next_morning_at' => 'datetime',
             'next_evening_at' => 'datetime',
@@ -53,6 +60,24 @@ class User extends Model
     public function reminderLogs(): HasMany
     {
         return $this->hasMany(ReminderLog::class);
+    }
+
+    public function botEvents(): HasMany
+    {
+        return $this->hasMany(BotEvent::class);
+    }
+
+    public function sendsReadingWithReminder(): bool
+    {
+        return $this->reminder_style === 'direct';
+    }
+
+    /**
+     * Short or full from the user's last reading, or null before the first choice.
+     */
+    public function rememberedMode(): ?AdhkarMode
+    {
+        return $this->mode_chosen_at !== null ? ($this->mode ?? AdhkarMode::Short) : null;
     }
 
     public function isOnboarded(): bool
