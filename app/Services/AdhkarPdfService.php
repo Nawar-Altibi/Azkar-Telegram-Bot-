@@ -88,7 +88,7 @@ class AdhkarPdfService
 
         $html = view('pdf.wird', [
             'title' => $title,
-            'heading' => str_starts_with($collectionKey, 'evening') ? 'أذكار المساء' : 'أذكار الصباح',
+            'heading' => $this->content->collectionHeading($collectionKey),
             'subtitle' => $this->subtitle($collectionKey, $fullOnly, $items->count()),
             'items' => $items->values(),
             'footer' => $this->content->footerText($collectionKey),
@@ -118,17 +118,21 @@ class AdhkarPdfService
 
     private function subtitle(string $collectionKey, bool $fullOnly, int $count): string
     {
-        $wird = match (true) {
-            $fullOnly => 'تتمة الورد الكامل',
-            str_contains($collectionKey, '_full') => 'الورد الكامل',
-            default => 'الورد المختصر',
-        };
-
         $amount = match (true) {
             $count === 1 => 'ذكر واحد',
             $count === 2 => 'ذكران',
             $count <= 10 => $count.' أذكار',
             default => $count.' ذكرًا',
+        };
+
+        if ($this->content->isSingleVersion($collectionKey)) {
+            return $amount;
+        }
+
+        $wird = match (true) {
+            $fullOnly => 'تتمة الورد الكامل',
+            str_contains($collectionKey, '_full') => 'الورد الكامل',
+            default => 'الورد المختصر',
         };
 
         return $wird.' · '.$amount;

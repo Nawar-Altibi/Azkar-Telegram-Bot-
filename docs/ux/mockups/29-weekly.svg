@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="520" viewBox="0 0 780 520">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .tb{font-size:14px;fill:#1b1b1b;font-weight:700}
+    .s{font-size:12px;fill:#6b7a83}
+    .b{font-size:14px;fill:#fff;font-weight:600}
+    .btn{fill:#5c7f96;opacity:.92}
+    .day{font-size:12px;fill:#fff}
+  </style>
+  <rect width="780" height="520" fill="#f6f7f4"/>
+  <text x="580" y="34" text-anchor="middle" class="cap">رسالة كل جمعة الصبح (اختيارية)</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">كيف بتنحسب؟</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="450" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="434" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="140" y="72" width="80" height="22" rx="11" fill="#7d9a74"/>
+    <text x="180" y="87" text-anchor="middle" class="day">الجمعة</text>
+
+    <rect x="18" y="104" width="300" height="236" rx="12" fill="#fff"/>
+    <text x="306" y="130" text-anchor="start" class="tb">🌿 جمعة مباركة!</text>
+    <text x="306" y="158" text-anchor="start" class="t">هاد حصاد أسبوعك مع الأذكار:</text>
+    <text x="306" y="192" text-anchor="start" class="t">🌅 أذكار الصباح:</text>
+    <text x="306" y="216" text-anchor="start" class="t">🟢🟢🟢⚪🟢🟢🟢  6 من 7 أيام</text>
+    <text x="306" y="248" text-anchor="start" class="t">🌙 أذكار المساء:</text>
+    <text x="306" y="272" text-anchor="start" class="t">🟢🟢⚪🟢🟢⚪🟢  5 من 7 أيام</text>
+    <text x="306" y="308" text-anchor="start" class="t">تقبّل الله منك، وجعلها عادة دايمة 🤲</text>
+
+    <rect x="18" y="346" width="300" height="36" rx="9" class="btn" opacity=".65"/>
+    <text x="168" y="369" text-anchor="middle" class="b">🔕 ما بدي هالرسالة</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect x="0" y="0" width="360" height="450" rx="16" fill="#fff" stroke="#d5dbe0"/>
+    <text x="340" y="40" text-anchor="start" class="tb">🟢 = قرأ الأذكار هداك اليوم</text>
+    <text x="340" y="68" text-anchor="start" class="tb">⚪ = ما في تسجيل لهداك اليوم</text>
+
+    <text x="340" y="116" text-anchor="start" class="tb">بيعتبر اليوم «مقروء» إذا:</text>
+    <text x="340" y="146" text-anchor="start" class="t">• وصل لآخر بطاقة وضغط «✅ تم»</text>
+    <text x="340" y="174" text-anchor="start" class="t">• أو وصل لآخر بطاقة من «أذكار اليوم»</text>
+    <text x="340" y="198" text-anchor="start" class="s">(هاد التاني بيحتاج نسجّل قراءة «أذكار اليوم»،</text>
+    <text x="340" y="216" text-anchor="start" class="s">لأنو هلق ما عم تنسجل)</text>
+
+    <text x="340" y="264" text-anchor="start" class="tb">🤍 قواعد اللطف:</text>
+    <text x="340" y="294" text-anchor="start" class="t">• ما في لوم ولا «قصّرت»، دايمًا كلام حلو</text>
+    <text x="340" y="322" text-anchor="start" class="t">• إذا الأسبوع كلو ⚪ ما منبعت شي</text>
+    <text x="340" y="350" text-anchor="start" class="t">• خاصة فيه، ما حدا غيرو بيشوفها</text>
+    <text x="340" y="378" text-anchor="start" class="t">• مطفية افتراضيًا، وبتنشغل من الإعدادات</text>
+    <text x="340" y="420" text-anchor="start" class="s">مثال لأسبوع ضعيف: «كل خطوة بتقرّبك 🌿»</text>
+  </g>
+</svg>

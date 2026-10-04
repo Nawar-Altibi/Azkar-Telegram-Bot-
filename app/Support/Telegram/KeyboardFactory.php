@@ -349,6 +349,7 @@ class KeyboardFactory
         return [
             'keyboard' => [
                 $this->rtl([['text' => '📖 أذكار اليوم'], ['text' => '🌟 أذكار إضافية']]),
+                $this->rtl([['text' => '🌙 أذكار النوم'], ['text' => '🌅 أذكار الاستيقاظ']]),
                 $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => $pauseOrResume]]),
                 [['text' => '❓ مساعدة']],
                 [['text' => '🌿 شرح البوت']],

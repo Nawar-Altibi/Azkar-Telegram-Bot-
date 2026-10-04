@@ -118,10 +118,11 @@ class ReminderDispatchService
                     'status' => ReminderLogStatus::Pending,
                 ]);
 
+                // Schedule from now, not from $dueAt, so a long outage yields one late reminder instead of one per missed day.
                 $next = ReminderScheduleCalculator::calculateNext(
                     $user->timezone,
                     (string) $localTime,
-                    $dueAt,
+                    $dueAt->copy()->max(now()),
                 );
 
                 if ($type === ReminderType::Morning) {

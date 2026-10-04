@@ -135,6 +135,8 @@ class TelegramUpdateProcessor
         $action = match ($text) {
             'أذكار اليوم', '📖 أذكار اليوم' => 'today',
             'أذكار إضافية', '🌟 أذكار إضافية' => 'additional',
+            'أذكار النوم', '🌙 أذكار النوم' => 'bedtime',
+            'أذكار الاستيقاظ', '🌅 أذكار الاستيقاظ' => 'waking',
             'الإعدادات', '⚙️ الإعدادات' => 'settings',
             'إيقاف التذكير', '⏸ إيقاف التذكير' => 'pause',
             'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
@@ -150,6 +152,8 @@ class TelegramUpdateProcessor
         match ($action) {
             'today' => $this->reply($user, __('bot.today_prompt'), $this->keyboards->todayMenu()),
             'additional' => $this->sendAdditionalList($user, null),
+            'bedtime' => $this->startManualReading($user, 'b'),
+            'waking' => $this->startManualReading($user, 'w'),
             'settings' => $this->sendSettings($user),
             'pause' => $this->handlePause($user),
             'resume' => $this->handleResume($user),
@@ -957,16 +961,12 @@ class TelegramUpdateProcessor
         $parts = explode(':', $data);
         $period = $parts[1] ?? '';
         $phase = $parts[2] ?? '';
-        if (! in_array($period, ['m', 'e'], true) || ! in_array($phase, ['s', 'f', 'a'], true)) {
+        $baseKey = $this->content->manualBaseKey($period, $phase);
+        if ($baseKey === null) {
             $this->safeAnswer($callbackId, __('bot.unknown'));
 
             return;
         }
-
-        $type = $period === 'e' ? ReminderType::Evening : ReminderType::Morning;
-        $baseKey = $phase === 'a'
-            ? $this->content->collectionKey(AdhkarMode::Full, $type)
-            : $this->content->collectionKey(AdhkarMode::Short, $type);
 
         $this->safeAnswer($callbackId);
         $this->presentReading($user, [
@@ -1064,6 +1064,21 @@ class TelegramUpdateProcessor
         return 'sv:t:'.($session['period'] ?? 'm').':'.$session['phase'];
     }
 
+    /**
+     * Single-version manual collections open straight on their first card, with no mode choice.
+     */
+    private function startManualReading(User $user, string $period): void
+    {
+        $this->presentReading($user, [
+            'scope' => 'today',
+            'period' => $period,
+            'log' => null,
+            'baseKey' => (string) $this->content->manualBaseKey($period, 'a'),
+            'phase' => 'a',
+            'index' => 0,
+        ], null);
+    }
+
     private function showTodayMenu(User $user, ?int $messageId): void
     {
         $this->show($user, __('bot.today_prompt'), $this->keyboards->todayMenu(), $messageId);
@@ -1096,18 +1111,15 @@ class TelegramUpdateProcessor
                 'phase' => $phase,
             ];
         } elseif ($kind === 't') {
-            $period = $parts[2] ?? '';
             $phase = $parts[3] ?? '';
-            if (! in_array($period, ['m', 'e'], true) || ! in_array($phase, ['s', 'f', 'a'], true)) {
+            $baseKey = $this->content->manualBaseKey($parts[2] ?? '', $phase);
+            if ($baseKey === null) {
                 $this->safeAnswer($callbackId, __('bot.unknown'));
 
                 return;
             }
-            $type = $period === 'e' ? ReminderType::Evening : ReminderType::Morning;
             $session = [
-                'baseKey' => $phase === 'a'
-                    ? $this->content->collectionKey(AdhkarMode::Full, $type)
-                    : $this->content->collectionKey(AdhkarMode::Short, $type),
+                'baseKey' => $baseKey,
                 'phase' => $phase,
             ];
         }

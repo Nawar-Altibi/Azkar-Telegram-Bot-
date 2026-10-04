@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="720" viewBox="0 0 780 720">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .tb{font-size:14px;fill:#1b1b1b;font-weight:700}
+    .s{font-size:12px;fill:#6b7a83}
+    .b{font-size:14px;fill:#fff;font-weight:600}
+    .btn{fill:#5c7f96;opacity:.92}
+  </style>
+  <rect width="780" height="720" fill="#f6f7f4"/>
+  <text x="580" y="34" text-anchor="middle" class="cap">① بيضغط «❓ المساعدة والشرح»</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">② بيختار سؤاله وبيوصله جواب قصير</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="650" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="634" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="290" height="86" rx="12" fill="#fff"/>
+    <text x="296" y="101" text-anchor="start" class="tb">❓ أهلًا فيك 🌿</text>
+    <text x="296" y="126" text-anchor="start" class="t">شو السؤال يلي ببالك؟</text>
+    <text x="296" y="150" text-anchor="start" class="s">اضغط على سؤالك 👇</text>
+
+    <rect x="18" y="168" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="192" text-anchor="middle" class="b">🌿 شو فكرة البوت؟</text>
+    <rect x="18" y="210" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="234" text-anchor="middle" class="b">📖 كيف بقرأ الأذكار؟</text>
+    <rect x="18" y="252" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="276" text-anchor="middle" class="b">⏰ كيف بغيّر وقت التذكير؟</text>
+    <rect x="18" y="294" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="318" text-anchor="middle" class="b">⏸ كيف بوقّف التذكير؟</text>
+    <rect x="18" y="336" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="360" text-anchor="middle" class="b">🔠 كيف بكبّر الخط؟</text>
+    <rect x="18" y="378" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="402" text-anchor="middle" class="b">🔕 ليش ما عم يوصلني التذكير؟</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect width="360" height="650" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="634" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="310" height="262" rx="12" fill="#fff"/>
+    <text x="316" y="102" text-anchor="start" class="tb">🔠 كيف بكبّر الخط؟</text>
+    <text x="316" y="132" text-anchor="start" class="t">إذا الكتابة صغيرة، كبّرها هيك:</text>
+    <text x="316" y="162" text-anchor="start" class="t">1️⃣ افتح القائمة ☰ فوق</text>
+    <text x="316" y="188" text-anchor="start" class="t">2️⃣ اضغط «الإعدادات»</text>
+    <text x="316" y="214" text-anchor="start" class="t">3️⃣ اضغط «إعدادات المحادثات»</text>
+    <text x="316" y="240" text-anchor="start" class="t">4️⃣ حرّك «حجم نص الرسائل» لليمين</text>
+    <text x="316" y="272" text-anchor="start" class="t">وبس! الكتابة بتكبر بكل تيليغرام 🌿</text>
+    <text x="316" y="302" text-anchor="start" class="s">ولو بدك، اطلب من حدا من أهلك</text>
+    <text x="316" y="322" text-anchor="start" class="s">يعملها معك مرة وحدة.</text>
+
+    <rect x="18" y="344" width="310" height="38" rx="9" class="btn"/>
+    <text x="173" y="368" text-anchor="middle" class="b">🔙 رجوع للأسئلة</text>
+  </g>
+</svg>

@@ -105,4 +105,50 @@ class AdhkarContentServiceTest extends TestCase
         $this->assertStringContainsString('كامل', $last);
         $this->assertStringContainsString('انتهت أذكار الصباح', $last);
     }
+
+    public function test_single_version_collections_have_their_own_labels(): void
+    {
+        $service = app(AdhkarContentService::class);
+        $item = new AdhkarItem(['title' => 'ذكر', 'arabic_text' => 'نص']);
+
+        $bedtime = $service->renderCard('bedtime', $item, 13, 13, true);
+        $this->assertStringStartsWith("🌙 أذكار النوم\n\nالذكر 13 من 13", $bedtime);
+        $this->assertStringContainsString('انتهت أذكار النوم', $bedtime);
+        $this->assertStringNotContainsString('مختصر', $bedtime);
+
+        $waking = $service->renderCard('waking', $item, 1, 2, false);
+        $this->assertStringStartsWith("🌅 أذكار الاستيقاظ\n\nالذكر 1 من 2", $waking);
+
+        $this->assertSame('أذكار النوم', $service->wirdTitle('bedtime'));
+        $this->assertSame('أذكار الاستيقاظ', $service->wirdTitle('waking'));
+        $this->assertStringContainsString('انتهت أذكار الاستيقاظ', $service->footerText('waking'));
+        $this->assertSame('أذكار الصباح — مختصر', $service->wirdTitle('morning_short'));
+        $this->assertSame('أذكار المساء — تتمة الورد الكامل', $service->wirdTitle('evening_short', true));
+    }
+
+    public function test_unknown_keys_never_fall_back_to_morning(): void
+    {
+        $service = app(AdhkarContentService::class);
+        $card = $service->renderCard('mystery', new AdhkarItem(['arabic_text' => 'نص']), 1, 1, false);
+
+        $this->assertStringStartsWith('📖 الأذكار', $card);
+        $this->assertStringNotContainsString('الصباح', $card);
+        $this->assertStringNotContainsString('الصباح', $service->wirdTitle('mystery'));
+        $this->assertSame('الأذكار', $service->collectionHeading('mystery'));
+    }
+
+    public function test_manual_base_key_resolves_periods_without_reminder_types(): void
+    {
+        $service = app(AdhkarContentService::class);
+
+        $this->assertSame('morning_short', $service->manualBaseKey('m', 's'));
+        $this->assertSame('morning_short', $service->manualBaseKey('m', 'f'));
+        $this->assertSame('evening_full', $service->manualBaseKey('e', 'a'));
+        $this->assertSame('bedtime', $service->manualBaseKey('b', 'a'));
+        $this->assertSame('waking', $service->manualBaseKey('w', 'a'));
+        $this->assertNull($service->manualBaseKey('b', 's'));
+        $this->assertNull($service->manualBaseKey('w', 'f'));
+        $this->assertNull($service->manualBaseKey('x', 'a'));
+        $this->assertNull($service->manualBaseKey('m', 'z'));
+    }
 }

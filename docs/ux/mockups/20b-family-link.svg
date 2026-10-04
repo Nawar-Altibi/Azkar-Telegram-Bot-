@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="300" viewBox="0 0 780 300">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5c6b73"/>
+    </marker>
+  </defs>
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .t{font-size:13px;fill:#1b1b1b}
+    .tb{font-size:15px;fill:#1b1b1b;font-weight:700}
+    .e{font-size:30px}
+    .box{fill:#fff;stroke:#9fb3bf;stroke-width:1.5}
+    .grn{fill:#e6f4ea;stroke:#8cc79b;stroke-width:1.5}
+    .ar{stroke:#5c6b73;stroke-width:2;marker-end:url(#a)}
+  </style>
+  <rect width="780" height="300" fill="#f6f7f4"/>
+  <text x="760" y="36" text-anchor="start" class="cap">👨‍👩‍👦 رابط العيلة: الابن بيجهّز البوت لأبوه أو أمه</text>
+
+  <rect x="600" y="60" width="160" height="200" rx="12" class="box"/>
+  <text x="680" y="100" text-anchor="middle" class="e">📱</text>
+  <text x="680" y="135" text-anchor="middle" class="tb">1️⃣ الابن</text>
+  <text x="680" y="162" text-anchor="middle" class="t">بيبعت رابط خاص</text>
+  <text x="680" y="184" text-anchor="middle" class="t">لأبوه على واتساب</text>
+  <text x="680" y="214" text-anchor="middle" class="t">مع رسالة جاهزة:</text>
+  <text x="680" y="236" text-anchor="middle" class="t">«اضغط هون يا بابا 🌿»</text>
+  <line x1="598" y1="160" x2="572" y2="160" class="ar"/>
+
+  <rect x="410" y="60" width="160" height="200" rx="12" class="box"/>
+  <text x="490" y="100" text-anchor="middle" class="e">👆</text>
+  <text x="490" y="135" text-anchor="middle" class="tb">2️⃣ الأب</text>
+  <text x="490" y="162" text-anchor="middle" class="t">بيضغط الرابط،</text>
+  <text x="490" y="184" text-anchor="middle" class="t">بيفتح تيليغرام،</text>
+  <text x="490" y="206" text-anchor="middle" class="t">وبيضغط الزر الأزرق</text>
+  <text x="490" y="228" text-anchor="middle" class="t">«ابدأ» تحت</text>
+  <line x1="408" y1="160" x2="382" y2="160" class="ar"/>
+
+  <rect x="220" y="60" width="160" height="200" rx="12" class="box"/>
+  <text x="300" y="100" text-anchor="middle" class="e">🌍</text>
+  <text x="300" y="135" text-anchor="middle" class="tb">3️⃣ البوت</text>
+  <text x="300" y="162" text-anchor="middle" class="t">بيفتح مباشرة</text>
+  <text x="300" y="184" text-anchor="middle" class="t">بالوضع المبسّط،</text>
+  <text x="300" y="206" text-anchor="middle" class="t">وبيسأل سؤال واحد:</text>
+  <text x="300" y="228" text-anchor="middle" class="t">«وين ساكن؟»</text>
+  <line x1="218" y1="160" x2="192" y2="160" class="ar"/>
+
+  <rect x="30" y="60" width="160" height="200" rx="12" class="grn"/>
+  <text x="110" y="100" text-anchor="middle" class="e">🎉</text>
+  <text x="110" y="135" text-anchor="middle" class="tb">4️⃣ خلص!</text>
+  <text x="110" y="162" text-anchor="middle" class="t">الأوقات المقترحة</text>
+  <text x="110" y="184" text-anchor="middle" class="t">بتنحفظ تلقائيًا،</text>
+  <text x="110" y="206" text-anchor="middle" class="t">وبكرا الصبح بيوصله</text>
+  <text x="110" y="228" text-anchor="middle" class="t">أول تذكير 🌅</text>
+</svg>

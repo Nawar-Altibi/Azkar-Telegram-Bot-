@@ -11,6 +11,11 @@ use Illuminate\Support\Collection;
 
 class AdhkarContentService
 {
+    /**
+     * Manual collections read in one version only, keyed by their period code in rt:/sv:t: callbacks.
+     */
+    private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking'];
+
     public function resolveCollection(User $user, ReminderType $type): ?AdhkarCollection
     {
         return AdhkarCollection::query()
@@ -24,6 +29,46 @@ class AdhkarContentService
         $variant = $mode === AdhkarMode::Full ? 'full' : 'short';
 
         return $type->value.'_'.$variant;
+    }
+
+    /**
+     * Base collection key for a manual reading callback, or null when the period/phase pair is not valid.
+     */
+    public function manualBaseKey(string $period, string $phase): ?string
+    {
+        if (isset(self::SINGLE_COLLECTIONS[$period])) {
+            return $phase === 'a' ? self::SINGLE_COLLECTIONS[$period] : null;
+        }
+
+        $type = match ($period) {
+            'm' => ReminderType::Morning,
+            'e' => ReminderType::Evening,
+            default => null,
+        };
+        if ($type === null || ! in_array($phase, ['s', 'f', 'a'], true)) {
+            return null;
+        }
+
+        return $this->collectionKey($phase === 'a' ? AdhkarMode::Full : AdhkarMode::Short, $type);
+    }
+
+    public function isSingleVersion(string $collectionKey): bool
+    {
+        return in_array($collectionKey, self::SINGLE_COLLECTIONS, true);
+    }
+
+    /**
+     * Plain Arabic title, e.g. "أذكار النوم". Unknown keys get a neutral title, never a morning one.
+     */
+    public function collectionHeading(string $collectionKey): string
+    {
+        return match (true) {
+            str_starts_with($collectionKey, 'morning') => 'أذكار الصباح',
+            str_starts_with($collectionKey, 'evening') => 'أذكار المساء',
+            $collectionKey === 'bedtime' => 'أذكار النوم',
+            $collectionKey === 'waking' => 'أذكار الاستيقاظ',
+            default => 'الأذكار',
+        };
     }
 
     /**
@@ -113,7 +158,10 @@ class AdhkarContentService
      */
     public function wirdTitle(string $collectionKey, bool $fullOnly = false): string
     {
-        $title = str_starts_with($collectionKey, 'evening') ? 'أذكار المساء' : 'أذكار الصباح';
+        $title = $this->collectionHeading($collectionKey);
+        if ($this->isSingleVersion($collectionKey)) {
+            return $title;
+        }
         if ($fullOnly) {
             return $title.' — تتمة الورد الكامل';
         }
@@ -357,10 +405,17 @@ class AdhkarContentService
 
     private function sessionHeader(string $collectionKey): string
     {
-        $evening = str_starts_with($collectionKey, 'evening');
-        $full = str_contains($collectionKey, '_full');
-        $title = $evening ? '🌙 أذكار المساء' : '🌅 أذكار الصباح';
-        $mode = $full ? __('bot.mode_full') : __('bot.mode_short');
+        $icon = match (true) {
+            str_starts_with($collectionKey, 'morning'), $collectionKey === 'waking' => '🌅',
+            str_starts_with($collectionKey, 'evening'), $collectionKey === 'bedtime' => '🌙',
+            default => '📖',
+        };
+        $title = $icon.' '.$this->collectionHeading($collectionKey);
+        if ($this->isSingleVersion($collectionKey) || $icon === '📖') {
+            return $title;
+        }
+
+        $mode = str_contains($collectionKey, '_full') ? __('bot.mode_full') : __('bot.mode_short');
 
         return $title."\n🌿 ".$mode;
     }
@@ -370,6 +425,8 @@ class AdhkarContentService
         return match (true) {
             str_starts_with($key, 'morning') => "🌿 انتهت أذكار الصباح\n\nبارك الله في ذكرك",
             str_starts_with($key, 'evening') => "🌿 انتهت أذكار المساء\n\nبارك الله في ذكرك",
+            $key === 'bedtime' => "🌙 انتهت أذكار النوم\n\nنومًا هانئًا، وبارك الله في ذكرك",
+            $key === 'waking' => "🌅 انتهت أذكار الاستيقاظ\n\nيومًا مباركًا، وبارك الله في ذكرك",
             default => 'هذه أذكار اختيارية، خذ منها ما تيسّر.',
         };
     }

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="560" viewBox="0 0 780 560">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .tb{font-size:14px;fill:#1b1b1b;font-weight:700}
+    .s{font-size:12px;fill:#6b7a83}
+    .b{font-size:14px;fill:#fff;font-weight:600}
+    .btn{fill:#5c7f96;opacity:.92}
+    .day{font-size:12px;fill:#fff}
+  </style>
+  <rect width="780" height="560" fill="#f6f7f4"/>
+  <text x="580" y="34" text-anchor="middle" class="cap">شكل التذكير التاني</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">قواعده حتى ما يزعج</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="490" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="474" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="290" height="70" rx="12" fill="#fff"/>
+    <text x="296" y="102" text-anchor="start" class="tb">🌅 حان وقت أذكار الصباح</text>
+    <text x="296" y="128" text-anchor="start" class="t">...</text>
+    <text x="28" y="138" text-anchor="start" class="s" style="direction:ltr">6:00</text>
+    <rect x="18" y="150" width="290" height="36" rx="9" class="btn"/>
+    <text x="163" y="173" text-anchor="middle" class="b">📖 ابدأ القراءة</text>
+
+    <rect x="130" y="206" width="100" height="22" rx="11" fill="#7d9a74"/>
+    <text x="180" y="221" text-anchor="middle" class="day">⏳ مرّت ساعة</text>
+
+    <rect x="18" y="242" width="290" height="96" rx="12" fill="#fff"/>
+    <text x="296" y="268" text-anchor="start" class="tb">🌿 لسا في وقت لأذكار الصباح</text>
+    <text x="296" y="296" text-anchor="start" class="t">ولو بخمس دقايق بس،</text>
+    <text x="296" y="320" text-anchor="start" class="t">الله يكتب أجرك 🤍</text>
+    <text x="28" y="330" text-anchor="start" class="s" style="direction:ltr">7:00</text>
+    <rect x="18" y="344" width="290" height="40" rx="9" class="btn"/>
+    <text x="163" y="369" text-anchor="middle" class="b">📖 يلا نقرأ</text>
+    <rect x="18" y="388" width="290" height="36" rx="9" class="btn" opacity=".65"/>
+    <text x="163" y="411" text-anchor="middle" class="b">🔕 لا تبعتلي تذكير تاني</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect x="0" y="0" width="360" height="490" rx="16" fill="#fff" stroke="#d5dbe0"/>
+    <text x="340" y="40" text-anchor="start" class="tb">✅ بيتبعت بس إذا:</text>
+    <text x="340" y="72" text-anchor="start" class="t">• ما ضغط «ابدأ القراءة» خلال ساعة</text>
+    <text x="340" y="100" text-anchor="start" class="t">• ولسا نفس الوقت (الصبح لسا ما خلص)</text>
+    <text x="340" y="128" text-anchor="start" class="t">• والمستخدم مفعّل هالخيار</text>
+
+    <text x="340" y="180" text-anchor="start" class="tb">❌ ما بيتبعت أبدًا إذا:</text>
+    <text x="340" y="212" text-anchor="start" class="t">• فتح التذكير الأول وبلّش يقرأ</text>
+    <text x="340" y="240" text-anchor="start" class="t">• قرأ الأذكار من «أذكار اليوم»</text>
+    <text x="340" y="268" text-anchor="start" class="t">• التذكيرات موقّفة</text>
+
+    <text x="340" y="320" text-anchor="start" class="tb">📏 الحد الأقصى:</text>
+    <text x="340" y="352" text-anchor="start" class="t">رسالة تانية وحدة بس، مو أكتر.</text>
+
+    <text x="340" y="404" text-anchor="start" class="tb">⚙️ الافتراضي:</text>
+    <text x="340" y="436" text-anchor="start" class="t">مطفي للكل، ومشغّل بالوضع المبسّط.</text>
+    <text x="340" y="462" text-anchor="start" class="s">ومنقدر نغيّر «ساعة» لأي مدة بدنا ياها.</text>
+  </g>
+</svg>

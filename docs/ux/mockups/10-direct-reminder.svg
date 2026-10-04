@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="580" viewBox="0 0 780 580">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .tb{font-size:14px;fill:#1b1b1b;font-weight:700}
+    .big{font-size:17px;fill:#1b1b1b;font-weight:600}
+    .s{font-size:12px;fill:#6b7a83}
+    .b{font-size:14px;fill:#fff;font-weight:600}
+    .btn{fill:#5c7f96;opacity:.92}
+  </style>
+  <rect width="780" height="580" fill="#f6f7f4"/>
+  <text x="580" y="34" text-anchor="middle" class="cap">اليوم: التذكير رسالة تنبيه بس</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">الخيار الجديد: الذكر الأول بيوصل فورًا</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="510" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="494" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="290" height="124" rx="12" fill="#fff"/>
+    <text x="296" y="102" text-anchor="start" class="tb">🌅 حان وقت أذكار الصباح</text>
+    <text x="296" y="132" text-anchor="start" class="t">اختر الورد الذي يناسبك الآن:</text>
+    <text x="296" y="158" text-anchor="start" class="t">🌿 مختصر: تقريبًا 5 دقائق</text>
+    <text x="296" y="184" text-anchor="start" class="t">📖 كامل: تقريبًا 10–15 دقيقة</text>
+
+    <rect x="165" y="206" width="143" height="38" rx="9" class="btn"/>
+    <text x="236" y="230" text-anchor="middle" class="b">🌿 مختصر</text>
+    <rect x="18" y="206" width="143" height="38" rx="9" class="btn"/>
+    <text x="89" y="230" text-anchor="middle" class="b">📖 كامل</text>
+    <rect x="18" y="248" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="272" text-anchor="middle" class="b">⚙️ تعديل الوقت</text>
+
+    <rect x="30" y="320" width="300" height="130" rx="12" fill="#fde8e6" stroke="#e5a49d"/>
+    <text x="318" y="346" text-anchor="start" class="tb">😕 المشكلة لكبار السن:</text>
+    <text x="318" y="374" text-anchor="start" class="t">بيشوف الإشعار، بيفتح، بيلاقي سؤال</text>
+    <text x="318" y="400" text-anchor="start" class="t">وأزرار، وما بيعرف شو يضغط،</text>
+    <text x="318" y="426" text-anchor="start" class="t">فممكن يسكّر وما يقرأ شي.</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect width="360" height="510" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="494" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="310" height="196" rx="12" fill="#fff"/>
+    <text x="316" y="102" text-anchor="start" class="tb">🌅 صباح الخير! هاي أذكار الصباح</text>
+    <text x="316" y="126" text-anchor="start" class="s">الذكر 1 من 9</text>
+    <line x1="30" y1="138" x2="316" y2="138" stroke="#e3e3e3"/>
+    <text x="316" y="170" text-anchor="start" class="big">[ هون بيظهر نص الذكر الأول ]</text>
+    <text x="316" y="198" text-anchor="start" class="big">[ بخط واضح ومشكّل ]</text>
+    <text x="316" y="232" text-anchor="start" class="t">🔁 يُقال مرة واحدة</text>
+    <text x="316" y="256" text-anchor="start" class="s">▸ الفضل والمصدر (اضغط للعرض)</text>
+
+    <rect x="18" y="278" width="310" height="44" rx="9" class="btn"/>
+    <text x="173" y="306" text-anchor="middle" class="b">التالي ◀</text>
+    <rect x="18" y="326" width="310" height="36" rx="9" class="btn" opacity=".7"/>
+    <text x="173" y="349" text-anchor="middle" class="b">📥 أرسل الورد كاملًا</text>
+
+    <rect x="30" y="384" width="300" height="80" rx="12" fill="#e6f4ea" stroke="#8cc79b"/>
+    <text x="318" y="410" text-anchor="start" class="tb">😊 ما في أي سؤال:</text>
+    <text x="318" y="436" text-anchor="start" class="t">بيفتح، بيقرأ، بيضغط «التالي». خلص.</text>
+  </g>
+</svg>

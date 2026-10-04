@@ -13,7 +13,7 @@ Language: Arabic. UI strings live in `lang/ar/bot.php`. Religious text lives in 
 | `/resume` | Enable reminders, show the saved times, refresh the reply keyboard. |
 | `/today` | Choice menu, then the chosen reading starts immediately from the user's current mode. No reminder log and no Done button. |
 
-Reply keyboard: أذكار اليوم، أذكار إضافية، الإعدادات، إيقاف التذكير or تفعيل التذكير, مساعدة, and شرح البوت. شرح البوت resends the guide and does not restart setup. The pause/resume label follows `reminders_enabled`. Inline rows are reversed so the primary Arabic action sits on the right.
+Reply keyboard: أذكار اليوم، أذكار إضافية، أذكار النوم، أذكار الاستيقاظ، الإعدادات، إيقاف التذكير or تفعيل التذكير, مساعدة, and شرح البوت. النوم and الاستيقاظ share their own row. Existing users see the new row the next time the bot sends the main keyboard (for example `/start` or `/help`). شرح البوت resends the guide and does not restart setup. The pause/resume label follows `reminders_enabled`. Inline rows are reversed so the primary Arabic action sits on the right.
 
 The first region screen has no Back button. Later choice screens (America region, time presets, mode) show Back only. Settings region selection still has Back. Cancel appears only on free-text prompts opened from settings, and it discards the unsaved text and returns to the settings summary. During first-time onboarding, free-text prompts show Back only. The settings root keeps its own close button.
 
@@ -42,6 +42,18 @@ The job sends one short nudge and marks the log `sent`. It does not send the adh
 Each card is one adhkar: period title, مختصر or كامل, `الذكر 3 من 9`, then title, repetition, Arabic, virtue in a blockquote, and a compact source line. There is no duration estimate on the card. Next sits on the right and Previous on the left; both edit the same message. The cursor is the callback (`rd:{logId}:{s|f|a}:{index}` for a reminder, `rt:{m|e}:{s|f|a}:{index}` for Today), not a database column. On the last short card, `أكمل الورد الكامل` opens only the items that are in the full wird and not the short one, without changing the saved mode. Previous on the first of those returns to the last short card. A user already on كامل does not see that button. `📥 أرسل الورد كاملًا` sends the current list as ordinary messages with no keyboard and does not store a copy. Today uses the same pager and has no Done button. Narrator and guidance stay on a single additional item.
 
 Additional adhkar are a grouped library (short, after prayer, salawat, all). They are never scheduled.
+
+## Bedtime and waking (manual only)
+
+`🌙 أذكار النوم` (13 items) and `🌅 أذكار الاستيقاظ` (2 items, for waking up from sleep) are reached only from their reply-keyboard buttons. They are not in `/today`, which stays morning, evening, and additional.
+
+- One version each (collection keys `bedtime` and `waking`). No short/full choice, no مختصر or كامل on cards, and no duration estimate.
+- The button opens the first card at once, using the same pager as Today: `rt:b:a:{index}` and `rt:w:a:{index}`. Any other phase for `b`/`w` answers `bot.unknown`.
+- The header is the collection title only. The last card ends with its own closing line.
+- `📥 أرسل الورد كاملًا` uses `sv:t:b:a` / `sv:t:w:a`: the same PDF (titled أذكار النوم / أذكار الاستيقاظ) and the same text fallback.
+- No reminder log, no Done button, no stored reading state.
+- There are no bedtime or waking reminders. Onboarding and settings are unchanged.
+- Waking excludes «من تعار من الليل» and the night recitation of Aal-Imran 190–200. Sources: `resources/adhkar/bedtime.md`, `resources/adhkar/waking.md`.
 
 ## Recovery
 

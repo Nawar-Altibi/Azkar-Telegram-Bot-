@@ -1,6 +1,6 @@
 # AZKAR BOT
 
-Telegram bot for authentic Islamic adhkar (morning, evening, optional additional). Arabic-first, calm, no leaderboards.
+Telegram bot for authentic Islamic adhkar (morning, evening, optional additional, plus manual bedtime and waking collections without reminders). Arabic-first, calm, no leaderboards.
 
 ## Stack
 

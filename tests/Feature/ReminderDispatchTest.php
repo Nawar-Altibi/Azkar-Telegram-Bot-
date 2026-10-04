@@ -40,6 +40,26 @@ class ReminderDispatchTest extends TestCase
         $this->assertTrue($user->fresh()->next_morning_at->gt($originalNextMorning));
     }
 
+    public function test_long_outage_sends_one_late_reminder_instead_of_one_per_missed_day(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $user = User::factory()->create([
+            'reminders_enabled' => true,
+            'mode' => AdhkarMode::Short,
+            'timezone' => 'Asia/Damascus',
+            'morning_time' => '06:00:00',
+            'next_morning_at' => now()->subDays(10),
+            'next_evening_at' => now()->addHours(6),
+        ]);
+
+        $this->artisan('adhkar:dispatch-due-reminders')->assertSuccessful();
+        $this->artisan('adhkar:dispatch-due-reminders')->assertSuccessful();
+
+        $this->assertSame(1, ReminderLog::query()->where('user_id', $user->id)->count());
+        Bus::assertDispatchedTimes(SendAdhkarReminderJob::class, 1);
+        $this->assertTrue($user->fresh()->next_morning_at->isFuture());
+    }
+
     public function test_unique_constraint_rollback_does_not_advance_next_time(): void
     {
         $user = User::factory()->create([

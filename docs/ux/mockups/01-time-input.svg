@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="720" viewBox="0 0 780 720">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .s{font-size:12px;fill:#6b7a83}
+    .b{font-size:14px;fill:#fff;font-weight:600}
+    .btn{fill:#5c7f96;opacity:.92}
+  </style>
+  <rect width="780" height="720" fill="#f6f7f4"/>
+
+  <text x="580" y="34" text-anchor="middle" class="cap">① يختار من أزرار جاهزة (نظام 12 ساعة)</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">② أو يكتب الوقت بطريقته</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="650" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="634" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="290" height="62" rx="12" fill="#fff"/>
+    <text x="296" y="101" text-anchor="start" class="t">🌅 متى بدك نذكّرك بأذكار الصباح؟</text>
+    <text x="296" y="124" text-anchor="start" class="s">اضغط على الوقت المناسب 👇</text>
+
+    <rect x="165" y="144" width="143" height="38" rx="9" class="btn"/>
+    <text x="236" y="168" text-anchor="middle" class="b">5:00 صباحًا</text>
+    <rect x="18" y="144" width="143" height="38" rx="9" class="btn"/>
+    <text x="89" y="168" text-anchor="middle" class="b">5:30 صباحًا</text>
+
+    <rect x="165" y="186" width="143" height="38" rx="9" class="btn"/>
+    <text x="236" y="210" text-anchor="middle" class="b">6:00 صباحًا</text>
+    <rect x="18" y="186" width="143" height="38" rx="9" class="btn"/>
+    <text x="89" y="210" text-anchor="middle" class="b">6:30 صباحًا</text>
+
+    <rect x="18" y="228" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="252" text-anchor="middle" class="b">7:00 صباحًا</text>
+
+    <rect x="18" y="270" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="294" text-anchor="middle" class="b">⏰ وقت آخر (أكتبه بنفسي)</text>
+
+    <rect x="18" y="312" width="290" height="38" rx="9" class="btn"/>
+    <text x="163" y="336" text-anchor="middle" class="b">🔙 رجوع</text>
+
+    <rect x="18" y="380" width="324" height="150" rx="12" fill="#fff8e1" stroke="#e8c76a"/>
+    <text x="330" y="406" text-anchor="start" class="t" font-weight="700">💡 الفرق عن اليوم:</text>
+    <text x="330" y="434" text-anchor="start" class="t">اليوم الأزرار مكتوبة هيك: 16:00 و 18:30</text>
+    <text x="330" y="460" text-anchor="start" class="t">وهاد صعب على كبار السن يفهموه.</text>
+    <text x="330" y="490" text-anchor="start" class="t">بعد التعديل: 4:00 عصرًا و 6:30 مساءً</text>
+    <text x="330" y="514" text-anchor="start" class="t">يعني متل ما الناس بتحكي بالعادة.</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect width="360" height="650" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="634" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="290" height="84" rx="12" fill="#fff"/>
+    <text x="296" y="101" text-anchor="start" class="t">⏰ اكتب الوقت يلي بيناسبك</text>
+    <text x="296" y="126" text-anchor="start" class="s">مثلًا: 8 مساءً  أو  6:30 صباحًا</text>
+    <text x="296" y="148" text-anchor="start" class="s">أو: 8 المسا  أو  6 ونص الصبح</text>
+
+    <rect x="282" y="172" width="60" height="38" rx="12" fill="#effdde"/>
+    <text x="312" y="197" text-anchor="middle" class="t">8</text>
+
+    <rect x="18" y="222" width="290" height="62" rx="12" fill="#fff"/>
+    <text x="296" y="247" text-anchor="start" class="t">🤔 قصدك الساعة 8 الصبح</text>
+    <text x="296" y="270" text-anchor="start" class="t">ولا الساعة 8 المسا؟</text>
+
+    <rect x="165" y="290" width="143" height="38" rx="9" class="btn"/>
+    <text x="236" y="314" text-anchor="middle" class="b">☀️ 8:00 صباحًا</text>
+    <rect x="18" y="290" width="143" height="38" rx="9" class="btn"/>
+    <text x="89" y="314" text-anchor="middle" class="b">🌙 8:00 مساءً</text>
+
+    <rect x="18" y="342" width="290" height="62" rx="12" fill="#fff"/>
+    <text x="296" y="367" text-anchor="start" class="t">✅ تمام! رح ذكّرك كل يوم</text>
+    <text x="296" y="390" text-anchor="start" class="t">الساعة 8:00 مساءً 🌙</text>
+
+    <rect x="18" y="430" width="324" height="196" rx="12" fill="#fff8e1" stroke="#e8c76a"/>
+    <text x="330" y="456" text-anchor="start" class="t" font-weight="700">💡 كل هدول الكتابات بتنفهم:</text>
+    <text x="330" y="486" text-anchor="start" class="t">«8 م»  ←  8:00 مساءً</text>
+    <text x="330" y="512" text-anchor="start" class="t">«8 بالليل»  ←  8:00 مساءً</text>
+    <text x="330" y="538" text-anchor="start" class="t">«6 ونص الصبح»  ←  6:30 صباحًا</text>
+    <text x="330" y="564" text-anchor="start" class="t">«20:00»  ←  8:00 مساءً</text>
+    <text x="330" y="590" text-anchor="start" class="t">«8» لحالها  ←  البوت بيسأل صبح ولا مسا</text>
+    <text x="330" y="614" text-anchor="start" class="s">(ولو كتب بالأرقام العربية ٨ كمان بتنفهم)</text>
+  </g>
+</svg>

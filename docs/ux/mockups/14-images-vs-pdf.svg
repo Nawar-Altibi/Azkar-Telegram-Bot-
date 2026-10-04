@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="580" viewBox="0 0 780 580">
+  <style>
+    text{font-family:'Segoe UI','Tahoma',sans-serif;direction:rtl}
+    .cap{font-size:18px;font-weight:700;fill:#2b3a42}
+    .h{font-size:16px;font-weight:700;fill:#fff}
+    .t{font-size:14px;fill:#1b1b1b}
+    .tb{font-size:14px;fill:#1b1b1b;font-weight:700}
+    .s{font-size:12px;fill:#6b7a83}
+    .pg{font-size:15px;fill:#3b2f1e;font-weight:700}
+  </style>
+  <rect width="780" height="580" fill="#f6f7f4"/>
+  <text x="580" y="34" text-anchor="middle" class="cap">📄 اليوم: ملف PDF</text>
+  <text x="200" y="34" text-anchor="middle" class="cap">🖼 الاقتراح: صور بخط كبير</text>
+
+  <g transform="translate(400,50)">
+    <rect width="360" height="510" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="494" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="80" width="290" height="76" rx="12" fill="#fff"/>
+    <circle cx="270" cy="118" r="24" fill="#517da2"/>
+    <text x="270" y="125" text-anchor="middle" font-size="20" fill="#fff">⬇</text>
+    <text x="236" y="112" text-anchor="start" class="tb">ملف أذكار الصباح (PDF)</text>
+    <text x="236" y="136" text-anchor="start" class="s">180 KB</text>
+
+    <rect x="30" y="190" width="300" height="230" rx="12" fill="#fde8e6" stroke="#e5a49d"/>
+    <text x="318" y="216" text-anchor="start" class="tb">😕 شو بيصير لما يضغط؟</text>
+    <text x="318" y="246" text-anchor="start" class="t">1. لازم ينزّل الملف أول</text>
+    <text x="318" y="272" text-anchor="start" class="t">2. الموبايل بيسأله: «فتح بواسطة...؟»</text>
+    <text x="318" y="298" text-anchor="start" class="t">3. أحيانًا ما في تطبيق PDF أصلًا</text>
+    <text x="318" y="324" text-anchor="start" class="t">4. بيفتح برا تيليغرام وبيضيع</text>
+    <text x="318" y="350" text-anchor="start" class="t">5. الصفحة كاملة، فالخط بيطلع صغير</text>
+    <text x="318" y="390" text-anchor="start" class="s">(الـ PDF بيضل موجود كخيار تاني</text>
+    <text x="318" y="408" text-anchor="start" class="s">لمين بدو يطبعه أو يحفظه)</text>
+  </g>
+
+  <g transform="translate(20,50)">
+    <rect width="360" height="510" rx="28" fill="#1f2a33"/>
+    <rect x="8" y="8" width="344" height="494" rx="22" fill="#dfe7d3"/>
+    <rect x="8" y="8" width="344" height="52" rx="22" fill="#517da2"/>
+    <rect x="8" y="38" width="344" height="22" fill="#517da2"/>
+    <text x="180" y="40" text-anchor="middle" class="h">بوت الأذكار 🌿</text>
+
+    <rect x="18" y="76" width="300" height="200" rx="12" fill="#fff"/>
+    <rect x="166" y="82" width="146" height="188" rx="6" fill="#fbf6ea" stroke="#d9c9a3"/>
+    <text x="239" y="106" text-anchor="middle" class="pg">أذكار الصباح</text>
+    <text x="239" y="124" text-anchor="middle" class="s">صفحة 1 من 3</text>
+    <rect x="180" y="138" width="118" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="186" y="156" width="112" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="180" y="174" width="118" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="200" y="192" width="98" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="180" y="218" width="118" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="190" y="236" width="108" height="10" rx="5" fill="#8a7a5c"/>
+    <rect x="24" y="82" width="138" height="91" rx="6" fill="#fbf6ea" stroke="#d9c9a3"/>
+    <text x="93" y="132" text-anchor="middle" class="s">صفحة 2</text>
+    <rect x="24" y="179" width="138" height="91" rx="6" fill="#fbf6ea" stroke="#d9c9a3"/>
+    <text x="93" y="229" text-anchor="middle" class="s">صفحة 3</text>
+
+    <rect x="30" y="300" width="300" height="178" rx="12" fill="#e6f4ea" stroke="#8cc79b"/>
+    <text x="318" y="326" text-anchor="start" class="tb">😊 شو بيصير لما يضغط؟</text>
+    <text x="318" y="356" text-anchor="start" class="t">1. الصورة بتفتح فورًا جوا تيليغرام</text>
+    <text x="318" y="382" text-anchor="start" class="t">2. بيكبّرها بإصبعين متل أي صورة</text>
+    <text x="318" y="408" text-anchor="start" class="t">3. بيسحب لليمين لصفحة تانية</text>
+    <text x="318" y="434" text-anchor="start" class="t">4. بتنحفظ عندو وبيقرأها بلا نت</text>
+    <text x="318" y="462" text-anchor="start" class="s">وكل صفحة فيها أذكار أقل وخط أكبر.</text>
+  </g>
+</svg>
