@@ -62,7 +62,11 @@ class KeyboardFactory
     public function timezoneOptions(bool $includeBack = true): array
     {
         $rows = [];
-        $cities = config('adhkar.timezones', []);
+        $featured = config('adhkar.featured_timezones', []);
+        $cities = array_filter(
+            config('adhkar.timezones', []),
+            fn (array $city) => in_array($city['label'], $featured, true),
+        );
         $row = [];
 
         foreach ($cities as $index => $city) {
@@ -78,8 +82,9 @@ class KeyboardFactory
         if ($row !== []) {
             $rows[] = $this->rtl($row);
         }
-        $rows[] = [['text' => 'دولة أخرى', 'callback_data' => 'onb:tz:custom']];
-        $rows[] = [['text' => '📍 حدد بلدي من موقعي (اختياري)', 'callback_data' => 'onb:loc']];
+        // style colours the button on clients since Bot API 9.4; older clients ignore it.
+        $rows[] = [['text' => '✍️ دولة أخرى (أكتب اسمها)', 'callback_data' => 'onb:tz:custom', 'style' => 'primary']];
+        $rows[] = [['text' => '📍 حدد بلدي من موقعي', 'callback_data' => 'onb:loc', 'style' => 'success']];
         if ($includeBack) {
             $rows[] = $this->backOnlyRow();
         }
@@ -281,17 +286,14 @@ class KeyboardFactory
             'morning' => [['text' => $morning['text'].$now] + $morning, $evening],
             'evening' => [['text' => $evening['text'].$now] + $evening, $morning],
             'night' => [
-                ['text' => '🌙 أذكار النوم'.$now, 'callback_data' => 'today:bedtime'],
+                ['text' => '🛌 أذكار النوم'.$now, 'callback_data' => 'today:bedtime'],
                 $evening,
                 $morning,
             ],
             default => [$morning, $evening],
         };
 
-        $rows = array_map(fn (array $button) => [$button], $choices);
-        $rows[] = [['text' => '🌟 أذكار إضافية', 'callback_data' => 'add:list']];
-
-        return ['inline_keyboard' => $rows];
+        return ['inline_keyboard' => array_map(fn (array $button) => [$button], $choices)];
     }
 
     /**
@@ -339,37 +341,18 @@ class KeyboardFactory
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    public function additionalGroups(): array
-    {
-        $rows = [];
-        foreach (config('adhkar.additional_groups', []) as $group) {
-            $rows[] = [[
-                'text' => $group['label'],
-                'callback_data' => 'add:group:'.$group['key'],
-            ]];
-        }
-        $rows[] = [['text' => '📚 جميع الأذكار', 'callback_data' => 'add:group:all']];
-        $rows[] = [['text' => '🔙 رجوع', 'callback_data' => 'add:back']];
-
-        return ['inline_keyboard' => $rows];
-    }
-
-    /**
      * @param  iterable<int, array{id:int,title:string}>  $items
      * @return array<string, mixed>
      */
-    public function additionalList(iterable $items, string $groupKey): array
+    public function additionalList(iterable $items): array
     {
         $rows = [];
         foreach ($items as $item) {
             $rows[] = [[
-                'text' => $item['title'],
-                'callback_data' => 'add:item:'.$item['id'].':'.$groupKey,
+                'text' => '✨ '.$item['title'],
+                'callback_data' => 'add:item:'.$item['id'],
             ]];
         }
-        $rows[] = [['text' => '🔙 رجوع', 'callback_data' => 'add:list']];
 
         return ['inline_keyboard' => $rows];
     }
@@ -377,15 +360,20 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function additionalItem(?string $groupKey = null): array
+    public function additionalItem(?int $prevId, ?int $nextId): array
     {
-        $back = $groupKey !== null && $groupKey !== '' ? 'add:group:'.$groupKey : 'add:list';
+        $nav = [];
+        if ($nextId !== null) {
+            $nav[] = ['text' => 'التالي ⬅️', 'callback_data' => 'add:item:'.$nextId];
+        }
+        if ($prevId !== null) {
+            $nav[] = ['text' => '➡️ السابق', 'callback_data' => 'add:item:'.$prevId];
+        }
 
-        return [
-            'inline_keyboard' => [[
-                ['text' => '🔙 رجوع', 'callback_data' => $back],
-            ]],
-        ];
+        $rows = $nav === [] ? [] : [$nav];
+        $rows[] = [['text' => '📋 كل الأذكار الإضافية', 'callback_data' => 'add:list']];
+
+        return ['inline_keyboard' => $rows];
     }
 
     /**
@@ -485,8 +473,9 @@ class KeyboardFactory
     {
         $keyboard = [
             'keyboard' => [
-                $this->rtl([['text' => '📖 أذكار اليوم'], ['text' => '🌟 أذكار إضافية']]),
-                $this->rtl([['text' => '🌙 أذكار النوم'], ['text' => '🌅 أذكار الاستيقاظ']]),
+                $this->rtl([['text' => '🌅 أذكار الصباح'], ['text' => '🌙 أذكار المساء']]),
+                $this->rtl([['text' => '☀️ أذكار الاستيقاظ'], ['text' => '🛌 أذكار النوم']]),
+                $this->rtl([['text' => '🕌 أذكار الصلاة'], ['text' => '🌟 أذكار إضافية']]),
                 $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => '❓ المساعدة والشرح']]),
             ],
             'resize_keyboard' => true,

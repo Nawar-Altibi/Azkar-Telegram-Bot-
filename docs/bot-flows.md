@@ -15,12 +15,12 @@ Language: Arabic, in a warm, simple Levantine tone. UI strings live in `lang/ar/
 
 Command descriptions are registered in Arabic with `php artisan telegram:commands:set`.
 
-Reply keyboard, three rows: [أذكار اليوم، أذكار إضافية], [أذكار النوم، أذكار الاستيقاظ], [الإعدادات، ❓ المساعدة والشرح]. It is persistent by default (`users.keyboard_persistent`), with the placeholder «اختر من الأزرار 👇»; the user can turn that off in settings. Old keyboard labels (مساعدة، شرح البوت، إيقاف التذكير، تفعيل التذكير) still work. Inline rows are reversed so the primary Arabic action sits on the right.
+Reply keyboard, four rows: [🌅 أذكار الصباح، 🌙 أذكار المساء], [☀️ أذكار الاستيقاظ، 🛌 أذكار النوم], [🕌 أذكار الصلاة، 🌟 أذكار إضافية], [⚙️ الإعدادات، ❓ المساعدة والشرح]. Morning and evening open the wird directly (remembered short/full, or the mode choice). It is persistent by default (`users.keyboard_persistent`), with the placeholder «اختر من الأزرار 👇»; the user can turn that off in settings. Old keyboard labels (📖 أذكار اليوم، 🌙 أذكار النوم، 🌅 أذكار الاستيقاظ، مساعدة، شرح البوت، إيقاف التذكير، تفعيل التذكير) still work. Inline rows are reversed so the primary Arabic action sits on the right.
 
 ## Setup
 
 1. Tutorial, then `🚀 ابدأ الإعداد`.
-2. Country list, «دولة أخرى» for typing a name, and an optional `📍 حدد بلدي من موقعي (اختياري)`.
+2. Eight featured countries (`config('adhkar.featured_timezones')`: سوريا، لبنان، الأردن، فلسطين، العراق، مصر، السعودية، تركيا), then `✍️ دولة أخرى (أكتب اسمها)` (blue, `style: primary`) and `📍 حدد بلدي من موقعي` (green, `style: success`). The full list in `config('adhkar.timezones')` still backs typed names and `onb:tz:{index}`.
    - The location button sends a bottom keyboard with Telegram's location request and «🌍 بختار من القائمة», plus the note that the location is not stored.
    - A shared location is matched to the nearest timezone from PHP's bundled tz database (`App\Support\NearestTimezone`). Only that timezone is cached for 30 minutes; coordinates are never saved.
    - The bot confirms with the local time: «الساعة عندك هلق 4:26 عصرًا، صح؟» with `✅ صح` (`loc:yes`) and `🌍 بختار بنفسي` (`loc:no`, back to the list).
@@ -48,15 +48,17 @@ Rows: region, morning time, evening time, reminder style, follow-up, bottom keyb
 
 ## Reading
 
-`/today` greets by time of day (`App\Support\DayPeriod`, windows in `config('adhkar.day_windows')`) and puts the current period first, marked «⭐ وقتها هلق». At night, bedtime goes first. No choice is removed. Additional adhkar are always last.
+`/today` greets by time of day (`App\Support\DayPeriod`, windows in `config('adhkar.day_windows')`) and puts the current period first, marked «⭐ وقتها هلق». At night, bedtime goes first. No choice is removed. Additional adhkar have their own keyboard button and are no longer in this menu.
 
 The first time the user opens morning or evening they pick short or full; the choice is remembered (`users.mode`, `users.mode_chosen_at`) and later readings open straight on the remembered wird. The first card has a switch button (`📖 بدّل للورد الكامل` or `🌿 بدّل للورد المختصر`) that also updates the remembered choice.
 
-Each card is one adhkar: header, `الذكر 3 من 9`, title, `🔁 التكرار`, the Arabic text, then virtue, source, and grade together in an expandable blockquote. «التالي ⬅️» sits alone on the top row, «➡️ السابق» below it. Both edit the same message. The cursor is the callback: `rd:{logId}:{s|f|a}:{index}` for a reminder, `rt:{m|e|b|w}:{s|f|a}:{index}` for Today. On the last short card, `أكمل الورد الكامل` opens only the items that are in the full wird and not the short one.
+Each card is one adhkar: header, `الذكر 3 من 9`, title, `🔁 التكرار`, the Arabic text, then virtue, source, and grade together in a blockquote (expandable when there is a virtue). The narrator and guidance notes are never shown, and titles carry no repetition counts. «التالي ⬅️» sits alone on the top row, «➡️ السابق» below it. Both edit the same message. The cursor is the callback: `rd:{logId}:{s|f|a}:{index}` for a reminder, `rt:{m|e|b|w|p}:{s|f|a}:{index}` for Today. On the last short card, `أكمل الورد الكامل` opens only the items that are in the full wird and not the short one.
 
 `📥 أرسل الورد كاملًا` (`sv:…`) sends the wird pages as photos (an album, rendered from the PDF by `pdftoppm` and cached next to it), followed by `🖨 نسخة PDF للطباعة` (`sp:…`) which sends the PDF. Without `pdftoppm` (for example on a local machine) the PDF is sent directly. If the PDF fails too, the wird is sent as text messages.
 
-Bedtime and waking are single-version collections opened from their own buttons, with no reminder, no Done button, and no short/full choice.
+Bedtime, waking (3 adhkar) and after-prayer (fter_prayer, 8 adhkar from Hisn al-Muslim chapter 25, period code p) are single-version collections opened from their own buttons, with no reminder, no Done button, and no short/full choice.
+
+🌟 Additional adhkar: one flat list, one button per dhikr (dd:item:{id}). Each card shows «🌟 أذكار إضافية», «الذكر 3 من 8», previous/next, and «📋 كل الأذكار الإضافية» (dd:list). Old dd:group:*, dd:back and dd:item:{id}:{group} buttons still open the list or the card. The salawat formulas and their virtue are one item; the after-prayer tasbih moved to fter_prayer.
 
 ## Reminders
 

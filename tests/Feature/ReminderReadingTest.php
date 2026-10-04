@@ -6,12 +6,16 @@ use App\Enums\AdhkarMode;
 use App\Enums\ReminderLogStatus;
 use App\Enums\ReminderType;
 use App\Jobs\SendAdhkarReminderJob;
+use App\Models\AdhkarCollection;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
 use App\Services\ContentSyncService;
 use App\Services\Telegram\TelegramUpdateProcessor;
+use App\Support\Telegram\KeyboardFactory;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
@@ -186,7 +190,7 @@ class ReminderReadingTest extends TestCase
 
     public function test_partial_chunk_failure_keeps_the_claim_and_hides_the_technical_error(): void
     {
-        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::swap(new Factory);
         Http::preventStrayRequests();
         Http::fake([
             'https://api.telegram.org/*' => Http::sequence()
@@ -284,7 +288,7 @@ class ReminderReadingTest extends TestCase
     {
         $user = $this->user();
         $log = $this->sentLog($user, 'morning_short');
-        $short = \App\Models\AdhkarCollection::query()->where('key', 'morning_short')->first();
+        $short = AdhkarCollection::query()->where('key', 'morning_short')->first();
         $last = $short->items()->count() - 1;
 
         $this->start($log, 80);
@@ -356,7 +360,7 @@ class ReminderReadingTest extends TestCase
         $user = $this->user();
         $user->update(['mode' => AdhkarMode::Full]);
         $log = $this->sentLog($user, 'morning_short');
-        $collection = \App\Models\AdhkarCollection::query()->where('key', 'morning_short')->first();
+        $collection = AdhkarCollection::query()->where('key', 'morning_short')->first();
         $expected = app(AdhkarContentService::class)->snapshotVersions(
             $collection->items()->where('adhkar_items.active', true)->get()
         );
@@ -366,12 +370,12 @@ class ReminderReadingTest extends TestCase
         $this->assertSame($expected['content_snapshot_hash'], $log->fresh()->content_snapshot_hash);
     }
 
-    public function test_main_keyboard_puts_today_on_the_right_and_offers_undo_after_pause(): void
+    public function test_main_keyboard_puts_morning_on_the_right_and_offers_undo_after_pause(): void
     {
         $user = $this->user();
-        $keyboard = app(\App\Support\Telegram\KeyboardFactory::class)->mainReplyKeyboard($user);
+        $keyboard = app(KeyboardFactory::class)->mainReplyKeyboard($user);
         $top = $keyboard['keyboard'][0];
-        $this->assertSame('📖 أذكار اليوم', $top[array_key_last($top)]['text']);
+        $this->assertSame('🌅 أذكار الصباح', $top[array_key_last($top)]['text']);
         $this->assertStringNotContainsString('إيقاف', json_encode($keyboard, JSON_UNESCAPED_UNICODE));
 
         app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('/pause', 70, 1001));
@@ -401,7 +405,7 @@ class ReminderReadingTest extends TestCase
 
     public function test_pdf_is_uploaded_once_then_resent_by_file_id(): void
     {
-        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::swap(new Factory);
         Http::preventStrayRequests();
         Http::fake([
             'https://api.telegram.org/*' => Http::response([
@@ -420,7 +424,7 @@ class ReminderReadingTest extends TestCase
         $this->assertSame('FILE-123', $documents[1][0]['document'] ?? null);
     }
 
-    private function multipartField(\Illuminate\Http\Client\Request $request, string $name): string
+    private function multipartField(Request $request, string $name): string
     {
         foreach ($request->data() as $part) {
             if (is_array($part) && ($part['name'] ?? null) === $name) {

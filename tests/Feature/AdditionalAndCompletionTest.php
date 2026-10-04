@@ -34,43 +34,65 @@ class AdditionalAndCompletionTest extends TestCase
         $this->assertTrue(AdhkarItem::query()->where('key', 'additional.01')->exists());
     }
 
-    public function test_additional_menu_is_grouped_and_never_scheduled(): void
+    public function test_additional_menu_is_one_flat_list_and_never_scheduled(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+        $active = AdhkarItem::query()->where('category', AdhkarCategory::Additional)->where('active', true)->orderBy('order')->get();
 
         $this->process($this->telegramMessagePayload('🌟 أذكار إضافية', 12));
 
-        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:prayer'));
+        Http::assertSent(function ($request) use ($active) {
+            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
+            $callbacks = array_map(fn (array $row) => $row[0]['callback_data'] ?? '', $markup['inline_keyboard'] ?? []);
+
+            return str_contains((string) ($request['text'] ?? ''), 'أذكار إضافية')
+                && $callbacks === $active->map(fn (AdhkarItem $item) => 'add:item:'.$item->id)->all();
+        });
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:'));
         $this->assertSame(0, ReminderLog::query()->where('collection_key', 'additional')->count());
     }
 
-    public function test_salawat_group_is_labelled_with_the_salawat_and_navigates_in_place(): void
+    public function test_salawat_is_one_item_and_moved_or_merged_items_are_hidden(): void
+    {
+        foreach (['additional.03', 'additional.10', 'additional.11'] as $key) {
+            $this->assertFalse(AdhkarItem::query()->where('key', $key)->sole()->active, $key);
+        }
+
+        $salawat = AdhkarItem::query()->where('key', 'additional.09')->sole();
+        $this->assertSame('الصلاة على النبي ﷺ', $salawat->title);
+        $this->assertStringContainsString('كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ', $salawat->arabic_text);
+        $this->assertStringContainsString('عشرًا', $salawat->virtue);
+        $this->assertStringNotContainsString('درجتها', $salawat->source_name);
+    }
+
+    public function test_item_card_navigates_in_place_and_old_buttons_still_work(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
-        $hidden = AdhkarItem::query()->where('key', 'additional.11')->firstOrFail();
-        $this->assertFalse($hidden->active);
-        $item = AdhkarItem::query()->where('key', 'additional.09')->firstOrFail();
+        $items = AdhkarItem::query()->where('category', AdhkarCategory::Additional)->where('active', true)->orderBy('order')->get()->values();
+        $second = $items[1];
 
-        $this->process($this->telegramMessagePayload('🌟 أذكار إضافية', 20));
-        Http::assertSent(fn ($request) => ($request['text'] ?? null) === '🌟 أذكار وفضائل إضافية'
-            && str_contains((string) ($request['reply_markup'] ?? ''), 'الصلاة على النبي ﷺ'));
-        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'قسم اختياري'));
-
-        $this->process($this->telegramCallbackPayload('add:group:salawat', 21));
-        Http::assertSent(function ($request) use ($item) {
-            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
-            $first = $markup['inline_keyboard'][0][0] ?? [];
+        $this->process($this->telegramCallbackPayload('add:item:'.$second->id, 21));
+        Http::assertSent(function ($request) use ($items) {
+            $text = (string) ($request['text'] ?? '');
+            $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($request->url(), 'editMessageText')
-                && ($first['callback_data'] ?? '') === 'add:item:'.$item->id.':salawat';
+                && str_contains($text, 'الذكر 2 من '.$items->count())
+                && ! str_contains($text, 'الراوي')
+                && str_contains($markup, 'add:item:'.$items[0]->id)
+                && str_contains($markup, 'add:item:'.$items[2]->id)
+                && str_contains($markup, 'add:list');
         });
 
-        $this->process($this->telegramCallbackPayload('add:group:all', 22));
-        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'صلى الله عليه وسلم'));
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 1]], 200),
+        ]);
+        $this->process($this->telegramCallbackPayload('add:item:'.$second->id.':short', 22));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الذكر 2 من'));
 
-        $this->process($this->telegramCallbackPayload('add:item:'.$item->id.':salawat', 23));
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
-            && str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:salawat'));
+        $this->process($this->telegramCallbackPayload('add:group:salawat', 23));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:item:'.$items[0]->id)
+            && ! str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:'));
     }
 
     public function test_completion_callback_is_idempotent(): void

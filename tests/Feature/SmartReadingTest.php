@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\ContentSyncService;
 use App\Services\Telegram\TelegramUpdateProcessor;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -47,12 +48,12 @@ class SmartReadingTest extends TestCase
         $night = $this->lastMarkup();
         $this->assertSame('today:bedtime', $night['inline_keyboard'][0][0]['callback_data']);
         $this->assertSame(
-            ['today:bedtime', 'today:evening', 'today:morning', 'add:list'],
+            ['today:bedtime', 'today:evening', 'today:morning'],
             collect($night['inline_keyboard'])->flatten(1)->pluck('callback_data')->all(),
         );
 
         $this->handle($this->telegramCallbackPayload('today:bedtime', 4));
-        $this->assertStringStartsWith('🌙 أذكار النوم', $this->lastText());
+        $this->assertStringStartsWith('🛌 أذكار النوم', $this->lastText());
     }
 
     public function test_first_choice_is_remembered_and_can_be_switched(): void
@@ -143,7 +144,7 @@ class SmartReadingTest extends TestCase
         app(TelegramUpdateProcessor::class)->handle($payload);
     }
 
-    private function lastRequest(): \Illuminate\Http\Client\Request
+    private function lastRequest(): Request
     {
         return collect(Http::recorded())
             ->filter(fn ($pair) => str_contains($pair[0]->url(), 'sendMessage') || str_contains($pair[0]->url(), 'editMessageText'))

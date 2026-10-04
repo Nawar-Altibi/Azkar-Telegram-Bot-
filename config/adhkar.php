@@ -62,32 +62,8 @@ return [
         ],
     ],
 
-    // Navigation only. Keys already exist in additional.php; this does not add a religious classification.
-    'additional_groups' => [
-        [
-            'key' => 'short',
-            'label' => 'أذكار قصيرة',
-            'items' => [
-                'additional.01',
-                'additional.02',
-                'additional.04',
-                'additional.05',
-                'additional.06',
-                'additional.07',
-                'additional.08',
-            ],
-        ],
-        [
-            'key' => 'prayer',
-            'label' => 'أذكار بعد الصلاة',
-            'items' => ['additional.03'],
-        ],
-        [
-            'key' => 'salawat',
-            'label' => 'الصلاة على النبي ﷺ',
-            'items' => ['additional.09', 'additional.10'],
-        ],
-    ],
+    // Countries shown as buttons in the region step, by label from 'timezones'. The rest are reached by typing.
+    'featured_timezones' => ['سوريا', 'لبنان', 'الأردن', 'فلسطين', 'العراق', 'مصر', 'السعودية', 'تركيا'],
 
     // أسماء الدول والمدن الشائعة التي يكتبها المستخدم بنفسه، وكلها تُطابق منطقة زمنية واحدة.
     // صيغ الهمزة و"ال" التعريف لا حاجة لتكرارها هنا؛ يتكفّل TimezoneCatalog بتطبيعها قبل المطابقة.

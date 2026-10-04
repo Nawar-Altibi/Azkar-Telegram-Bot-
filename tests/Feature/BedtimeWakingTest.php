@@ -7,11 +7,14 @@ use App\Models\AdhkarCollection;
 use App\Models\AdhkarItem;
 use App\Models\ReminderLog;
 use App\Models\User;
+use App\Services\AdhkarContentService;
 use App\Services\AdhkarPdfService;
 use App\Services\ContentSyncService;
 use App\Services\Telegram\TelegramUpdateProcessor;
 use App\Support\Telegram\KeyboardFactory;
+use Carbon\Carbon;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
@@ -33,7 +36,8 @@ class BedtimeWakingTest extends TestCase
             array_map(fn (int $n) => sprintf('bedtime.%02d', $n), range(1, 13)),
             $this->keys('bedtime'),
         );
-        $this->assertSame(['waking.01', 'waking.02'], $this->keys('waking'));
+        $this->assertSame(['waking.01', 'waking.02', 'waking.03'], $this->keys('waking'));
+        $this->assertSame(array_map(fn (int $n) => sprintf('after_prayer.%02d', $n), range(1, 8)), $this->keys('after_prayer'));
 
         $this->assertSame('أذكار النوم', AdhkarCollection::query()->where('key', 'bedtime')->value('title'));
         $this->assertSame('أذكار الاستيقاظ', AdhkarCollection::query()->where('key', 'waking')->value('title'));
@@ -46,25 +50,24 @@ class BedtimeWakingTest extends TestCase
         $this->assertSame(20, count($this->keys('morning_full')));
         $this->assertSame(9, count($this->keys('evening_short')));
         $this->assertSame(19, count($this->keys('evening_full')));
-        $this->assertSame(10, count($this->keys('additional')));
+        $this->assertSame(8, count($this->keys('additional')));
 
         $second = app(ContentSyncService::class)->sync();
         $this->assertSame(0, $second['created']);
         $this->assertSame(0, $second['updated']);
-        $this->assertSame(0, AdhkarItem::query()->whereIn('category', ['bedtime', 'waking'])
-            ->whereHas('collections', fn ($q) => $q->whereNotIn('key', ['bedtime', 'waking']))->count());
+        $this->assertSame(0, AdhkarItem::query()->whereIn('category', ['bedtime', 'waking', 'after_prayer'])
+            ->whereHas('collections', fn ($q) => $q->whereNotIn('key', ['bedtime', 'waking', 'after_prayer']))->count());
     }
 
-    public function test_waking_excludes_night_waking_narrations(): void
+    public function test_waking_follows_hisn_and_excludes_aal_imran(): void
     {
         $texts = AdhkarItem::query()->where('category', 'waking')->pluck('arabic_text')->implode("\n");
 
         $this->assertStringContainsString('أَحْيَانَا بَعْدَ مَا أَمَاتَنَا', $texts);
         $this->assertStringContainsString('عَافَانِي فِي جَسَدِي', $texts);
-        $this->assertStringNotContainsString('تعار', $texts);
-        $this->assertStringNotContainsString('وَحْدَهُ لَا شَرِيكَ لَهُ', $texts);
+        $this->assertStringContainsString('رَبِّ اغْفِرْ لِي', $texts);
         $this->assertStringNotContainsString('اخْتِلَافِ اللَّيْلِ', $texts);
-        $this->assertFalse(AdhkarItem::query()->where('arabic_text', 'like', '%تعار%')->exists());
+        $this->assertSame('3878', AdhkarItem::query()->where('key', 'waking.03')->value('hadith_number'));
     }
 
     public function test_repetitions_and_sources_are_preserved(): void
@@ -100,27 +103,25 @@ class BedtimeWakingTest extends TestCase
         $keyboard = app(KeyboardFactory::class)->mainReplyKeyboard($this->user());
         $labels = collect($keyboard['keyboard'])->flatten(1)->pluck('text');
 
-        $this->assertSame(1, $labels->filter(fn ($l) => $l === '🌙 أذكار النوم')->count());
-        $this->assertSame(1, $labels->filter(fn ($l) => $l === '🌅 أذكار الاستيقاظ')->count());
-        $this->assertSame('📖 أذكار اليوم', $keyboard['keyboard'][0][1]['text']);
-        $this->assertSame('🌟 أذكار إضافية', $keyboard['keyboard'][0][0]['text']);
-        // Telegram draws the first button on the left, so النوم (the first choice) sits on the right.
-        $this->assertSame(['🌅 أذكار الاستيقاظ', '🌙 أذكار النوم'], array_column($keyboard['keyboard'][1], 'text'));
-        $this->assertSame('⚙️ الإعدادات', $keyboard['keyboard'][2][1]['text']);
-        $this->assertSame('❓ المساعدة والشرح', $keyboard['keyboard'][2][0]['text']);
-        $this->assertCount(3, $keyboard['keyboard']);
+        $this->assertSame($labels->count(), $labels->unique()->count());
+        // Telegram draws the first button on the left, so the first choice of each row sits on the right.
+        $this->assertSame(['🌙 أذكار المساء', '🌅 أذكار الصباح'], array_column($keyboard['keyboard'][0], 'text'));
+        $this->assertSame(['🛌 أذكار النوم', '☀️ أذكار الاستيقاظ'], array_column($keyboard['keyboard'][1], 'text'));
+        $this->assertSame(['🌟 أذكار إضافية', '🕌 أذكار الصلاة'], array_column($keyboard['keyboard'][2], 'text'));
+        $this->assertSame(['❓ المساعدة والشرح', '⚙️ الإعدادات'], array_column($keyboard['keyboard'][3], 'text'));
+        $this->assertCount(4, $keyboard['keyboard']);
     }
 
     public function test_bedtime_button_opens_the_first_card_immediately(): void
     {
         $this->user();
-        $this->message('🌙 أذكار النوم', 30);
+        $this->message('🛌 أذكار النوم', 30);
 
         $request = $this->lastSent('sendMessage');
         $text = (string) $request['text'];
         $markup = $this->markup($request);
 
-        $this->assertStringStartsWith('🌙 أذكار النوم', $text);
+        $this->assertStringStartsWith('🛌 أذكار النوم', $text);
         $this->assertStringContainsString('الذكر 1 من 13', $text);
         $this->assertStringContainsString('المعوّذات قبل النوم', $text);
         $this->assertStringContainsString('📚 صحيح البخاري 5017', $text);
@@ -139,17 +140,44 @@ class BedtimeWakingTest extends TestCase
     public function test_waking_button_opens_the_first_card_immediately(): void
     {
         $this->user();
-        $this->message('🌅 أذكار الاستيقاظ', 31);
+        $this->message('☀️ أذكار الاستيقاظ', 31);
 
         $request = $this->lastSent('sendMessage');
         $text = (string) $request['text'];
 
-        $this->assertStringStartsWith('🌅 أذكار الاستيقاظ', $text);
-        $this->assertStringContainsString('الذكر 1 من 2', $text);
+        $this->assertStringStartsWith('☀️ أذكار الاستيقاظ', $text);
+        $this->assertStringContainsString('الذكر 1 من 3', $text);
         $this->assertStringContainsString('أَحْيَانَا بَعْدَ مَا أَمَاتَنَا', $text);
         $this->assertStringNotContainsString('مختصر', $text);
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertSame('rt:w:a:1', $this->markup($request)['inline_keyboard'][0][0]['callback_data']);
+    }
+
+    public function test_prayer_button_opens_the_after_prayer_card(): void
+    {
+        $this->user();
+        $this->message('🕌 أذكار الصلاة', 32);
+
+        $request = $this->lastSent('sendMessage');
+        $text = (string) $request['text'];
+
+        $this->assertStringStartsWith('🕌 أذكار بعد الصلاة', $text);
+        $this->assertStringContainsString('الذكر 1 من 8', $text);
+        $this->assertStringContainsString('أَسْتَغْفِرُ اللَّهَ', $text);
+        $this->assertStringNotContainsString('مختصر', $text);
+        $this->assertSame('rt:p:a:1', $this->markup($request)['inline_keyboard'][0][0]['callback_data']);
+    }
+
+    public function test_morning_and_evening_buttons_open_their_wird(): void
+    {
+        $this->user();
+
+        $this->message('🌅 أذكار الصباح', 33);
+        $this->assertStringContainsString('أذكار الصباح', (string) $this->lastSent('sendMessage')['text']);
+
+        $this->message('🌙 أذكار المساء', 34);
+        $this->assertStringContainsString('أذكار المساء', (string) $this->lastSent('sendMessage')['text']);
+        Http::assertNotSent(fn ($r) => (string) ($r['text'] ?? '') === __('bot.unknown'));
     }
 
     public function test_next_previous_progress_and_last_card_boundary(): void
@@ -179,9 +207,9 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringNotContainsString('أكمل الورد الكامل', $markup);
         $this->assertStringNotContainsString('reminder:done:', $markup);
 
-        $this->press('rt:w:a:1', 43);
+        $this->press('rt:w:a:2', 43);
         $waking = $this->lastSent('editMessageText');
-        $this->assertStringContainsString('الذكر 2 من 2', (string) $waking['text']);
+        $this->assertStringContainsString('الذكر 3 من 3', (string) $waking['text']);
         $this->assertStringContainsString('انتهت أذكار الاستيقاظ', (string) $waking['text']);
     }
 
@@ -219,9 +247,9 @@ class BedtimeWakingTest extends TestCase
     public function test_full_ward_text_fallback_keeps_the_right_title(): void
     {
         $this->user();
-        $this->app->instance(AdhkarPdfService::class, new class(app(\App\Services\AdhkarContentService::class)) extends AdhkarPdfService
+        $this->app->instance(AdhkarPdfService::class, new class(app(AdhkarContentService::class)) extends AdhkarPdfService
         {
-            public function build(string $collectionKey, \Illuminate\Support\Collection $items, bool $fullOnly = false): array
+            public function build(string $collectionKey, Collection $items, bool $fullOnly = false): array
             {
                 throw new RuntimeException('pdf unavailable');
             }
@@ -234,8 +262,8 @@ class BedtimeWakingTest extends TestCase
             ->map(fn ($pair) => (string) ($pair[0]['text'] ?? ''))
             ->values();
         $this->assertSame(__('bot.pdf_failed'), $texts[0]);
-        $this->assertStringStartsWith('🌅 أذكار الاستيقاظ', $texts[1]);
-        $this->assertStringContainsString('الذكر 2 من 2', $texts[1]);
+        $this->assertStringStartsWith('☀️ أذكار الاستيقاظ', $texts[1]);
+        $this->assertStringContainsString('الذكر 3 من 3', $texts[1]);
         $this->assertStringNotContainsString('أذكار الصباح', $texts->implode("\n"));
     }
 
@@ -260,12 +288,12 @@ class BedtimeWakingTest extends TestCase
     {
         $this->user();
         // Early afternoon in Damascus sits between the morning and evening windows, so nothing is reordered.
-        $this->travelTo(\Carbon\Carbon::parse('2026-03-10 13:00:00', 'Asia/Damascus'));
+        $this->travelTo(Carbon::parse('2026-03-10 13:00:00', 'Asia/Damascus'));
 
         $this->message('/today', 100);
         $today = $this->markup($this->lastSent('sendMessage'));
         $this->assertSame(
-            ['today:morning', 'today:evening', 'add:list'],
+            ['today:morning', 'today:evening'],
             collect($today['inline_keyboard'])->flatten(1)->pluck('callback_data')->all(),
         );
 
@@ -278,7 +306,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringStartsWith("🌙 أذكار المساء\n🌿 كامل", $evening);
 
         $this->message('🌟 أذكار إضافية', 103);
-        Http::assertSent(fn ($r) => str_contains((string) ($r['reply_markup'] ?? ''), 'add:group:all'));
+        Http::assertSent(fn ($r) => str_contains((string) ($r['reply_markup'] ?? ''), 'add:item:'));
     }
 
     /**

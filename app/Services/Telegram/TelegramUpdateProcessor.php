@@ -25,6 +25,7 @@ use App\Support\Telegram\KeyboardFactory;
 use App\Support\Telegram\TelegramUpdate as IncomingUpdate;
 use App\Support\Telegram\TelegramUser;
 use App\Support\TimezoneCatalog;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -244,9 +245,12 @@ class TelegramUpdateProcessor
     {
         $action = match ($text) {
             'أذكار اليوم', '📖 أذكار اليوم' => 'today',
+            'أذكار الصباح', '🌅 أذكار الصباح' => 'morning',
+            'أذكار المساء', '🌙 أذكار المساء' => 'evening',
             'أذكار إضافية', '🌟 أذكار إضافية' => 'additional',
-            'أذكار النوم', '🌙 أذكار النوم' => 'bedtime',
-            'أذكار الاستيقاظ', '🌅 أذكار الاستيقاظ' => 'waking',
+            'أذكار النوم', '🌙 أذكار النوم', '🛌 أذكار النوم' => 'bedtime',
+            'أذكار الاستيقاظ', '🌅 أذكار الاستيقاظ', '☀️ أذكار الاستيقاظ' => 'waking',
+            'أذكار الصلاة', '🕌 أذكار الصلاة', 'أذكار بعد الصلاة', '🕌 أذكار بعد الصلاة' => 'prayer',
             'الإعدادات', '⚙️ الإعدادات' => 'settings',
             'إيقاف التذكير', '⏸ إيقاف التذكير' => 'pause',
             'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
@@ -261,9 +265,12 @@ class TelegramUpdateProcessor
 
         match ($action) {
             'today' => $this->showTodayMenu($user, null),
+            'morning' => $this->openPeriod($user, ReminderType::Morning, null),
+            'evening' => $this->openPeriod($user, ReminderType::Evening, null),
             'additional' => $this->sendAdditionalList($user, null),
             'bedtime' => $this->startManualReading($user, 'b'),
             'waking' => $this->startManualReading($user, 'w'),
+            'prayer' => $this->startManualReading($user, 'p'),
             'settings' => $this->sendSettings($user),
             'pause' => $this->askPauseConfirmation($user),
             'resume' => $this->handleResume($user),
@@ -954,53 +961,32 @@ class TelegramUpdateProcessor
 
     private function handleAdditionalCallback(User $user, string $data, string $callbackId, ?int $messageId): void
     {
-        if ($data === 'add:list') {
+        // add:back and add:group:* come from the older grouped menu; they all lead to the one list now.
+        if ($data === 'add:list' || $data === 'add:back' || str_starts_with($data, 'add:group:')) {
             $this->safeAnswer($callbackId);
             $this->sendAdditionalList($user, $messageId);
 
             return;
         }
 
-        if ($data === 'add:back') {
-            $this->safeAnswer($callbackId);
-            $this->showTodayMenu($user, $messageId);
-
-            return;
-        }
-
-        if (str_starts_with($data, 'add:group:')) {
-            $groupKey = substr($data, strlen('add:group:'));
-            $items = $this->additionalItems($groupKey);
-            if ($items === null) {
-                $this->safeAnswer($callbackId, __('bot.item_not_found'));
-
-                return;
-            }
-
-            $this->safeAnswer($callbackId);
-            $this->show($user, $this->additionalGroupTitle($groupKey), $this->keyboards->additionalList($items, $groupKey), $messageId);
-
-            return;
-        }
-
         if (str_starts_with($data, 'add:item:')) {
-            $parts = explode(':', substr($data, strlen('add:item:')));
-            $item = AdhkarItem::query()
-                ->where('id', (int) $parts[0])
-                ->where('category', AdhkarCategory::Additional)
-                ->where('active', true)
-                ->first();
-            if (! $item) {
+            $id = (int) explode(':', substr($data, strlen('add:item:')))[0];
+            $items = $this->additionalItems();
+            $position = $items->search(fn (AdhkarItem $item) => $item->id === $id);
+            if ($position === false) {
                 $this->safeAnswer($callbackId, __('bot.item_not_found'));
 
                 return;
             }
 
             $this->safeAnswer($callbackId);
+            $total = $items->count();
+            $text = "🌟 <b>أذكار إضافية</b>\nالذكر ".($position + 1)." من {$total}\n\n"
+                .$this->content->formatItem($items[$position], $position + 1);
             $this->show(
                 $user,
-                $this->content->formatItem($item, $item->order, detailed: true),
-                $this->keyboards->additionalItem($parts[1] ?? null),
+                $text,
+                $this->keyboards->additionalItem($items[$position - 1]->id ?? null, $items[$position + 1]->id ?? null),
                 $messageId,
             );
 
@@ -1008,14 +994,6 @@ class TelegramUpdateProcessor
         }
 
         $this->replyOldButton($user, $callbackId);
-    }
-
-    private function additionalGroupTitle(string $groupKey): string
-    {
-        $group = collect(config('adhkar.additional_groups', []))->firstWhere('key', $groupKey);
-        $label = is_array($group) ? $group['label'] : 'جميع الأذكار';
-
-        return __('bot.additional_intro')."\n\n<b>".e($label).'</b>';
     }
 
     private function handleReminderStart(User $user, int $logId, ?string $phase, string $callbackId, ?int $messageId): void
@@ -1204,39 +1182,25 @@ class TelegramUpdateProcessor
 
     private function sendAdditionalList(User $user, ?int $messageId): void
     {
-        $this->show($user, __('bot.additional_intro'), $this->keyboards->additionalGroups(), $messageId);
+        $list = $this->additionalItems()->map(fn (AdhkarItem $item) => [
+            'id' => $item->id,
+            'title' => $item->title ?: $item->key,
+        ]);
+
+        $this->show($user, __('bot.additional_intro'), $this->keyboards->additionalList($list), $messageId);
     }
 
     /**
-     * @return array<int, array{id:int,title:string}>|null
+     * @return Collection<int, AdhkarItem>
      */
-    private function additionalItems(string $groupKey): ?array
+    private function additionalItems(): Collection
     {
-        $query = AdhkarItem::query()
+        return AdhkarItem::query()
             ->where('category', AdhkarCategory::Additional)
-            ->where('active', true);
-
-        if ($groupKey === 'all') {
-            return $query->orderBy('order')->get()->map(fn (AdhkarItem $item) => [
-                'id' => $item->id,
-                'title' => $item->title ?: $item->key,
-            ])->all();
-        }
-
-        $group = collect(config('adhkar.additional_groups', []))->firstWhere('key', $groupKey);
-        if (! is_array($group)) {
-            return null;
-        }
-
-        $keys = $group['items'] ?? [];
-        $items = $query->whereIn('key', $keys)->get()->sortBy(
-            fn (AdhkarItem $item) => array_search($item->key, $keys, true)
-        );
-
-        return $items->map(fn (AdhkarItem $item) => [
-            'id' => $item->id,
-            'title' => $item->title ?: $item->key,
-        ])->values()->all();
+            ->where('active', true)
+            ->orderBy('order')
+            ->get()
+            ->values();
     }
 
     private function handleScheduledReadingNav(User $user, string $data, string $callbackId, ?int $messageId): void
@@ -1630,7 +1594,7 @@ class TelegramUpdateProcessor
     /**
      * Sends the wird pages as photos that open inside Telegram, with a button for the printable PDF.
      *
-     * @param  \Illuminate\Support\Collection<int, AdhkarItem>  $items
+     * @param  Collection<int, AdhkarItem>  $items
      * @return bool false when page images cannot be made here, so the caller sends the PDF
      */
     private function sendWirdImages(User $user, string $collectionKey, $items, bool $fullOnly, string $printCallback): bool
@@ -1699,7 +1663,7 @@ class TelegramUpdateProcessor
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, AdhkarItem>  $items
+     * @param  Collection<int, AdhkarItem>  $items
      */
     private function sendWirdPdf(User $user, string $collectionKey, $items, bool $fullOnly): void
     {
