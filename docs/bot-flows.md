@@ -56,9 +56,9 @@ Each card is one adhkar: header, `الذكر 3 من 9`, title, `🔁 التكر�
 
 `📥 أرسل الورد كاملًا` (`sv:…`) sends the wird pages as photos (an album, rendered from the PDF by `pdftoppm` and cached next to it), followed by `🖨 نسخة PDF للطباعة` (`sp:…`) which sends the PDF. Without `pdftoppm` (for example on a local machine) the PDF is sent directly. If the PDF fails too, the wird is sent as text messages.
 
-Bedtime, waking (3 adhkar) and after-prayer (fter_prayer, 8 adhkar from Hisn al-Muslim chapter 25, period code p) are single-version collections opened from their own buttons, with no reminder, no Done button, and no short/full choice.
+Bedtime, waking (3 adhkar), after-prayer (`after_prayer`, 8 adhkar from Hisn al-Muslim chapter 25, period code `p`) and the additional list (period code `z`, used for sending them all at once) are single-version collections, with no reminder, no Done button, and no short/full choice.
 
-🌟 Additional adhkar: one flat list, one button per dhikr (dd:item:{id}). Each card shows «🌟 أذكار إضافية», «الذكر 3 من 8», previous/next, and «📋 كل الأذكار الإضافية» (dd:list). Old dd:group:*, dd:back and dd:item:{id}:{group} buttons still open the list or the card. The salawat formulas and their virtue are one item; the after-prayer tasbih moved to fter_prayer.
+🌟 Additional adhkar: one flat list, one button per dhikr (`add:item:{id}`). Each card shows «🌟 أذكار إضافية», «الذكر 3 من 8», previous/next, and «📋 كل الأذكار الإضافية» (`add:list`). Under the list, «📥 أرسل كل الأذكار الإضافية» (`sv:t:z:a`) sends them all at once, as page images with a printable PDF button, or as a PDF when page images are not available. Old `add:group:*`, `add:back` and `add:item:{id}:{group}` buttons still open the list or the card. The salawat formulas and their virtue are one item; the after-prayer tasbih moved to `after_prayer`.
 
 ## Reminders
 
