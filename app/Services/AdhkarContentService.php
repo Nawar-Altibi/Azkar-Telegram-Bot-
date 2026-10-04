@@ -14,7 +14,7 @@ class AdhkarContentService
     /**
      * Manual collections read in one version only, keyed by their period code in rt:/sv:t: callbacks.
      */
-    private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking', 'p' => 'after_prayer'];
+    private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking', 'p' => 'after_prayer', 'z' => 'additional'];
 
     public function resolveCollection(User $user, ReminderType $type): ?AdhkarCollection
     {
@@ -68,6 +68,7 @@ class AdhkarContentService
             $collectionKey === 'bedtime' => 'أذكار النوم',
             $collectionKey === 'waking' => 'أذكار الاستيقاظ',
             $collectionKey === 'after_prayer' => 'أذكار بعد الصلاة',
+            $collectionKey === 'additional' => 'أذكار إضافية',
             default => 'الأذكار',
         };
     }
@@ -409,6 +410,7 @@ class AdhkarContentService
             $collectionKey === 'waking' => '☀️',
             $collectionKey === 'bedtime' => '🛌',
             $collectionKey === 'after_prayer' => '🕌',
+            $collectionKey === 'additional' => '🌟',
             default => '📖',
         };
         $title = $icon.' '.$this->collectionHeading($collectionKey);
@@ -429,6 +431,7 @@ class AdhkarContentService
             $key === 'bedtime' => "🌙 انتهت أذكار النوم\n\nنومًا هانئًا، وبارك الله في ذكرك",
             $key === 'waking' => "☀️ انتهت أذكار الاستيقاظ\n\nيومًا مباركًا، وبارك الله في ذكرك",
             $key === 'after_prayer' => "🕌 انتهت أذكار بعد الصلاة\n\nتقبّل الله صلاتك وذكرك",
+            $key === 'additional' => "🌟 انتهت الأذكار الإضافية\n\nبارك الله في ذكرك",
             default => 'هذه أذكار اختيارية، خذ منها ما تيسّر.',
         };
     }

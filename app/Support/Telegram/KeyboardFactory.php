@@ -353,6 +353,7 @@ class KeyboardFactory
                 'callback_data' => 'add:item:'.$item['id'],
             ]];
         }
+        $rows[] = [['text' => '📥 أرسل كل الأذكار الإضافية', 'callback_data' => 'sv:t:z:a', 'style' => 'success']];
 
         return ['inline_keyboard' => $rows];
     }

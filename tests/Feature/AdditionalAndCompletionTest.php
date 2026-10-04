@@ -46,10 +46,25 @@ class AdditionalAndCompletionTest extends TestCase
             $callbacks = array_map(fn (array $row) => $row[0]['callback_data'] ?? '', $markup['inline_keyboard'] ?? []);
 
             return str_contains((string) ($request['text'] ?? ''), 'أذكار إضافية')
-                && $callbacks === $active->map(fn (AdhkarItem $item) => 'add:item:'.$item->id)->all();
+                && array_slice($callbacks, 0, -1) === $active->map(fn (AdhkarItem $item) => 'add:item:'.$item->id)->all()
+                && end($callbacks) === 'sv:t:z:a';
         });
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'add:group:'));
         $this->assertSame(0, ReminderLog::query()->where('collection_key', 'additional')->count());
+    }
+
+    public function test_send_all_button_delivers_every_additional_dhikr_as_one_file(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+        config(['adhkar.pdftoppm_binary' => 'missing-pdftoppm-binary']);
+
+        $this->process($this->telegramCallbackPayload('sv:t:z:a', 30));
+
+        $document = collect(Http::recorded())->first(fn ($pair) => str_contains($pair[0]->url(), 'sendDocument'));
+        $this->assertNotNull($document);
+        $caption = collect($document[0]->data())->firstWhere('name', 'caption')['contents'] ?? '';
+        $this->assertSame('أذكار إضافية', $caption);
+        $this->assertSame(0, ReminderLog::query()->count());
     }
 
     public function test_salawat_is_one_item_and_moved_or_merged_items_are_hidden(): void
