@@ -14,6 +14,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
 use App\Services\AdhkarPdfService;
+use App\Services\BotEventRecorder;
 use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
@@ -39,6 +40,7 @@ class TelegramUpdateProcessor
         private readonly AdhkarContentService $content,
         private readonly AdhkarPdfService $pdf,
         private readonly KeyboardFactory $keyboards,
+        private readonly BotEventRecorder $events,
     ) {}
 
     /**
@@ -81,6 +83,7 @@ class TelegramUpdateProcessor
             ? $kind
             : 'other';
         $text = __('bot.media.'.$key);
+        $this->events->record($user, 'media', ['kind' => $key]);
 
         if ($user->onboarding_state !== OnboardingState::Completed) {
             $screen = $this->onboarding->start($user);
@@ -194,6 +197,7 @@ class TelegramUpdateProcessor
         $input = $this->quote($text);
 
         if ($user->onboarding_state !== OnboardingState::Completed) {
+            $this->events->unknownText($user, $text);
             $screen = $this->onboarding->start($user);
             $this->reply(
                 $user,
@@ -206,11 +210,13 @@ class TelegramUpdateProcessor
 
         $intent = IntentMatcher::match($text);
         if ($intent !== null) {
+            $this->events->record($user, 'intent', ['intent' => $intent]);
             $this->handleIntent($user, $intent);
 
             return;
         }
 
+        $this->events->unknownText($user, $text);
         $this->reply($user, __('bot.unknown_text', ['input' => $input]), $this->keyboards->mainReplyKeyboard($user));
     }
 
@@ -289,7 +295,7 @@ class TelegramUpdateProcessor
             return;
         }
 
-        $this->sendResponse($user, $this->onboarding->handleTimezone($user, $resolved['id'], $resolved['label']));
+        $this->sendOnboardingStep($user, $this->onboarding->handleTimezone($user, $resolved['id'], $resolved['label']), null, 'timezone');
     }
 
     private function handleCustomTime(User $user, string $text, string $kind): void
@@ -328,6 +334,7 @@ class TelegramUpdateProcessor
      */
     private function replyTimeError(User $user, string $text, string $kind, bool $fromSettings, InvalidTimeException $exception): void
     {
+        $this->events->record($user, 'time_error', ['reason' => $exception->reason, 'kind' => $kind]);
         $message = __('bot.'.$exception->reason, [
             'input' => $exception->reason === InvalidTimeException::LETTERS ? $this->quote($text) : $this->quoteLtr($text),
             'example' => $kind === 'evening' ? '6:30 مساءً' : '5:30 صباحًا',
@@ -388,6 +395,19 @@ class TelegramUpdateProcessor
         $response = $kind === 'morning'
             ? $this->onboarding->handleMorningTime($user, $time)
             : $this->onboarding->handleEveningTime($user, $time);
+        $this->sendOnboardingStep($user, $response, $messageId, $kind);
+    }
+
+    /**
+     * @param  array{text:string,reply_markup:?array}  $response
+     */
+    private function sendOnboardingStep(User $user, array $response, ?int $messageId, string $step): void
+    {
+        $this->events->record($user, 'onboarding_step', ['step' => $step]);
+        if ($user->fresh()?->onboarding_state === OnboardingState::Completed) {
+            $this->events->record($user, 'onboarding_completed');
+        }
+
         $this->sendResponse($user, $response, $messageId);
     }
 
@@ -504,6 +524,9 @@ class TelegramUpdateProcessor
 
         if ($data === 'onb:begin') {
             $this->safeAnswer($callbackId);
+            if ($user->onboarding_state === OnboardingState::New) {
+                $this->events->record($user, 'onboarding_started');
+            }
             $this->sendResponse($user, $this->onboarding->beginSetup($user), $messageId);
 
             return;
@@ -511,14 +534,14 @@ class TelegramUpdateProcessor
 
         if ($data === 'onb:quick:yes') {
             $this->safeAnswer($callbackId);
-            $this->sendResponse($user, $this->onboarding->acceptSuggestedTimes($user), $messageId);
+            $this->sendOnboardingStep($user, $this->onboarding->acceptSuggestedTimes($user), $messageId, 'quick_accepted');
 
             return;
         }
 
         if ($data === 'onb:quick:custom') {
             $this->safeAnswer($callbackId);
-            $this->sendResponse($user, $this->onboarding->chooseOwnTimes($user), $messageId);
+            $this->sendOnboardingStep($user, $this->onboarding->chooseOwnTimes($user), $messageId, 'quick_custom');
 
             return;
         }
@@ -637,6 +660,7 @@ class TelegramUpdateProcessor
     private function replyOldButton(User $user, string $callbackId): void
     {
         $this->safeAnswer($callbackId);
+        $this->events->record($user, 'old_button');
         $this->reply(
             $user,
             __('bot.old_button'),
@@ -689,7 +713,7 @@ class TelegramUpdateProcessor
             $this->settings->updateTimezone($user, $timezone, $label);
             $this->showSettingsSaved($user->fresh(), __('bot.timezone_saved', ['timezone' => $label]), $messageId);
         } else {
-            $this->sendResponse($user, $this->onboarding->handleTimezone($user, $timezone, $label), $messageId);
+            $this->sendOnboardingStep($user, $this->onboarding->handleTimezone($user, $timezone, $label), $messageId, 'timezone');
         }
     }
 
@@ -714,7 +738,7 @@ class TelegramUpdateProcessor
             $user->save();
             $this->showSettingsSaved($user->fresh(), __('bot.timezone_saved', ['timezone' => $label]), $messageId);
         } else {
-            $this->sendResponse($user, $this->onboarding->handleTimezone($user, $region['id'], $label), $messageId);
+            $this->sendOnboardingStep($user, $this->onboarding->handleTimezone($user, $region['id'], $label), $messageId, 'timezone');
         }
     }
 
@@ -909,6 +933,10 @@ class TelegramUpdateProcessor
         if ($phase !== null) {
             $this->rememberMode($user, $phase === 'a' ? AdhkarMode::Full : AdhkarMode::Short);
         }
+        $this->events->record($user, 'reminder_opened', [
+            'type' => $log->reminder_type?->value,
+            'collection' => $log->fresh()?->collection_key,
+        ]);
         $log->refresh();
         $this->deliverScheduledReading($user, $log, $messageId);
     }
@@ -1005,6 +1033,10 @@ class TelegramUpdateProcessor
         $log->update([
             'status' => ReminderLogStatus::Completed,
             'completed_at' => now(),
+        ]);
+        $this->events->record($user, 'reading_completed', [
+            'scope' => 'reminder',
+            'collection' => $log->collection_key,
         ]);
 
         $text = $log->reminder_type === ReminderType::Evening
@@ -1168,6 +1200,12 @@ class TelegramUpdateProcessor
             $this->show($user, $text, $markup, $messageId);
         } catch (Throwable $exception) {
             $this->recordReadingFailure($user, $session, $exception);
+
+            return;
+        }
+
+        if ($isLast && $session['scope'] === 'today') {
+            $this->events->record($user, 'reading_completed', ['scope' => 'manual', 'collection' => $headerKey]);
         }
     }
 
@@ -1364,6 +1402,7 @@ class TelegramUpdateProcessor
             return;
         }
 
+        $this->events->record($user, 'help_topic', ['topic' => $key]);
         $answer = __('bot.help_topics.'.$key.'.answer', [
             'short' => __('bot.duration_short'),
             'full' => __('bot.duration_full'),
@@ -1572,6 +1611,12 @@ class TelegramUpdateProcessor
             $this->reply($user, __('bot.need_start'));
 
             return;
+        }
+
+        if ($result === 'resumed') {
+            $this->events->record($user, 'resumed', ['seconds_after_pause' => $this->events->secondsSinceLastPause($user)]);
+        } elseif ($result === 'paused') {
+            $this->events->record($user, 'paused');
         }
 
         [$text, $markup] = match ($result) {

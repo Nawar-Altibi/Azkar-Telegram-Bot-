@@ -14,3 +14,5 @@ Schedule::command('adhkar:dispatch-due-reminders')
 Schedule::command('adhkar:recover-stale')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command('bot:prune-events')->daily();
