@@ -17,6 +17,7 @@ use App\Services\AdhkarPdfService;
 use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
+use App\Support\DayPeriod;
 use App\Support\Telegram\KeyboardFactory;
 use App\Support\Telegram\TelegramUpdate as IncomingUpdate;
 use App\Support\Telegram\TelegramUser;
@@ -148,7 +149,7 @@ class TelegramUpdateProcessor
             '/help' => $this->showHelpMenu($user, null),
             '/pause' => $this->handlePause($user),
             '/resume' => $this->handleResume($user),
-            '/today' => $this->reply($user, __('bot.today_prompt'), $this->keyboards->todayMenu()),
+            '/today' => $this->showTodayMenu($user, null),
             default => $this->reply($user, __('bot.unknown')),
         };
     }
@@ -173,7 +174,7 @@ class TelegramUpdateProcessor
         }
 
         match ($action) {
-            'today' => $this->reply($user, __('bot.today_prompt'), $this->keyboards->todayMenu()),
+            'today' => $this->showTodayMenu($user, null),
             'additional' => $this->sendAdditionalList($user, null),
             'bedtime' => $this->startManualReading($user, 'b'),
             'waking' => $this->startManualReading($user, 'w'),
@@ -478,6 +479,20 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if ($data === 'onb:quick:yes') {
+            $this->safeAnswer($callbackId);
+            $this->sendResponse($user, $this->onboarding->acceptSuggestedTimes($user), $messageId);
+
+            return;
+        }
+
+        if ($data === 'onb:quick:custom') {
+            $this->safeAnswer($callbackId);
+            $this->sendResponse($user, $this->onboarding->chooseOwnTimes($user), $messageId);
+
+            return;
+        }
+
         if (str_starts_with($data, 'onb:tzr:')) {
             $this->handleRegionCallback($user, $data, $callbackId, $messageId);
 
@@ -512,13 +527,48 @@ class TelegramUpdateProcessor
 
         if ($data === 'today:morning' || $data === 'today:evening') {
             $type = $data === 'today:morning' ? ReminderType::Morning : ReminderType::Evening;
+            $period = $type === ReminderType::Evening ? 'e' : 'm';
             $this->safeAnswer($callbackId);
-            $this->show(
-                $user,
-                $this->content->modeChoiceText($type),
-                $this->keyboards->modeChoice($type === ReminderType::Evening ? 'e' : 'm'),
-                $messageId,
-            );
+
+            $remembered = $user->rememberedMode();
+            if ($remembered !== null) {
+                $this->startPeriodReading($user, $period, $remembered, $messageId);
+
+                return;
+            }
+
+            $this->show($user, $this->content->modeChoiceText($type), $this->keyboards->modeChoice($period), $messageId);
+
+            return;
+        }
+
+        if ($data === 'today:bedtime') {
+            $this->safeAnswer($callbackId);
+            $this->startManualReading($user, 'b', $messageId);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'md:')) {
+            $parts = explode(':', $data);
+            $period = $parts[1] ?? '';
+            $phase = $parts[2] ?? '';
+            if (! in_array($period, ['m', 'e'], true) || ! in_array($phase, ['s', 'a'], true)) {
+                $this->replyOldButton($user, $callbackId);
+
+                return;
+            }
+
+            $this->safeAnswer($callbackId);
+            $mode = $phase === 'a' ? AdhkarMode::Full : AdhkarMode::Short;
+            $this->rememberMode($user, $mode);
+            $this->startPeriodReading($user, $period, $mode, $messageId);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'rsw:')) {
+            $this->handleLogSwitch($user, $data, $callbackId, $messageId);
 
             return;
         }
@@ -836,6 +886,9 @@ class TelegramUpdateProcessor
         }
 
         $this->safeAnswer($callbackId);
+        if ($phase !== null) {
+            $this->rememberMode($user, $phase === 'a' ? AdhkarMode::Full : AdhkarMode::Short);
+        }
         $log->refresh();
         $this->deliverScheduledReading($user, $log, $messageId);
     }
@@ -1100,7 +1153,7 @@ class TelegramUpdateProcessor
 
     /**
      * @param  array{scope:string,period?:string,log:?ReminderLog,baseKey:string,phase:string,index:int}  $session
-     * @return array{prev?:string,next?:string,continue?:string,done?:string,save?:string}
+     * @return array{prev?:string,next?:string,switch_to_full?:string,switch_to_short?:string,continue?:string,done?:string,save?:string}
      */
     private function readingActions(array $session, int $index, int $total, bool $isLast): array
     {
@@ -1118,6 +1171,14 @@ class TelegramUpdateProcessor
 
         if (! $isLast) {
             $actions['next'] = $this->readingCallback($session, $session['phase'], $index + 1);
+        }
+
+        if ($index === 0 && in_array($session['phase'], ['s', 'a'], true) && ! $this->content->isSingleVersion($session['baseKey'])) {
+            $target = $session['phase'] === 's' ? 'a' : 's';
+            $callback = $session['scope'] === 'log' && $session['log'] instanceof ReminderLog
+                ? 'rsw:'.$session['log']->id.':'.$target
+                : 'md:'.($session['period'] ?? 'm').':'.$target;
+            $actions[$target === 'a' ? 'switch_to_full' : 'switch_to_short'] = $callback;
         }
 
         if ($isLast && $session['phase'] === 's' && $this->content->fullOnlyItems($session['baseKey'])->isNotEmpty()) {
@@ -1158,7 +1219,7 @@ class TelegramUpdateProcessor
     /**
      * Single-version manual collections open straight on their first card, with no mode choice.
      */
-    private function startManualReading(User $user, string $period): void
+    private function startManualReading(User $user, string $period, ?int $messageId = null): void
     {
         $this->presentReading($user, [
             'scope' => 'today',
@@ -1167,7 +1228,90 @@ class TelegramUpdateProcessor
             'baseKey' => (string) $this->content->manualBaseKey($period, 'a'),
             'phase' => 'a',
             'index' => 0,
-        ], null);
+        ], $messageId);
+    }
+
+    private function startPeriodReading(User $user, string $period, AdhkarMode $mode, ?int $messageId): void
+    {
+        $phase = $mode === AdhkarMode::Full ? 'a' : 's';
+        $this->presentReading($user, [
+            'scope' => 'today',
+            'period' => $period,
+            'log' => null,
+            'baseKey' => (string) $this->content->manualBaseKey($period, $phase),
+            'phase' => $phase,
+            'index' => 0,
+        ], $messageId);
+    }
+
+    private function rememberMode(User $user, AdhkarMode $mode): void
+    {
+        $user->mode = $mode;
+        $user->mode_chosen_at = now();
+        $user->save();
+    }
+
+    private function handleLogSwitch(User $user, string $data, string $callbackId, ?int $messageId): void
+    {
+        $parts = explode(':', $data);
+        $phase = $parts[2] ?? '';
+        $log = ReminderLog::query()->where('id', (int) ($parts[1] ?? 0))->where('user_id', $user->id)->first();
+        if ($log === null || ! in_array($phase, ['s', 'a'], true)) {
+            $this->safeAnswer($callbackId, __('bot.reminder_not_found'));
+
+            return;
+        }
+
+        if ($log->reading_started_at === null) {
+            $this->handleReminderStart($user, $log->id, $phase, $callbackId, $messageId);
+
+            return;
+        }
+
+        if ($log->status === ReminderLogStatus::Completed) {
+            $this->safeAnswer($callbackId, __('bot.already_completed'));
+
+            return;
+        }
+
+        if (! $this->isCurrentLocalDay($user, $log)) {
+            $this->safeAnswer($callbackId);
+            $this->reply($user, __('bot.reminder_expired'), $this->keyboards->todayShortcut());
+
+            return;
+        }
+
+        $mode = $phase === 'a' ? AdhkarMode::Full : AdhkarMode::Short;
+        $switched = DB::transaction(function () use ($log, $mode) {
+            $locked = ReminderLog::query()->whereKey($log->id)->lockForUpdate()->first();
+            if ($locked === null || $locked->status === ReminderLogStatus::Completed) {
+                return false;
+            }
+
+            $key = $this->content->collectionKey($mode, $locked->reminder_type);
+            $collection = AdhkarCollection::query()->where('key', $key)->where('active', true)->first();
+            if ($collection === null) {
+                return false;
+            }
+
+            $snapshot = $this->content->snapshotVersions($collection->items()->where('adhkar_items.active', true)->get());
+            $locked->collection_key = $key;
+            $locked->content_version_map = $snapshot['content_version_map'];
+            $locked->content_snapshot_hash = $snapshot['content_snapshot_hash'];
+            $locked->save();
+
+            return true;
+        });
+
+        if (! $switched) {
+            $this->safeAnswer($callbackId, __('bot.content_missing'));
+
+            return;
+        }
+
+        $this->safeAnswer($callbackId);
+        $this->rememberMode($user, $mode);
+        $this->deliverScheduledReading($user, $log->refresh(), $messageId);
     }
 
     private function showHelpMenu(User $user, ?int $messageId): void
@@ -1193,7 +1337,9 @@ class TelegramUpdateProcessor
 
     private function showTodayMenu(User $user, ?int $messageId): void
     {
-        $this->show($user, __('bot.today_prompt'), $this->keyboards->todayMenu(), $messageId);
+        $period = DayPeriod::forUser($user);
+        $text = __('bot.today_prompt', ['greeting' => __('bot.greeting.'.($period ?? 'default'))]);
+        $this->show($user, $text, $this->keyboards->todayMenu($period), $messageId);
     }
 
     private function handleOfflineSave(User $user, string $data, string $callbackId): void

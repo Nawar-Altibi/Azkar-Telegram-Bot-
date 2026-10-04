@@ -259,6 +259,8 @@ class BedtimeWakingTest extends TestCase
     public function test_today_menu_and_existing_readers_are_unchanged(): void
     {
         $this->user();
+        // Early afternoon in Damascus sits between the morning and evening windows, so nothing is reordered.
+        $this->travelTo(\Carbon\Carbon::parse('2026-03-10 13:00:00', 'Asia/Damascus'));
 
         $this->message('/today', 100);
         $today = $this->markup($this->lastSent('sendMessage'));

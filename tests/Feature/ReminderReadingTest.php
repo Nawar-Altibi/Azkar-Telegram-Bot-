@@ -261,9 +261,9 @@ class ReminderReadingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($request->url(), 'editMessageText')
-                && str_contains((string) ($request['text'] ?? ''), 'أي ورد بتحب تقرأ هلق')
-                && str_contains($markup, 'rt:m:s:0')
-                && str_contains($markup, 'rt:m:a:0');
+                && str_contains((string) ($request['text'] ?? ''), 'أي ورد بتحب تقرأ')
+                && str_contains($markup, 'md:m:s')
+                && str_contains($markup, 'md:m:a');
         });
 
         app(TelegramUpdateProcessor::class)->handle(

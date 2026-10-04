@@ -166,8 +166,8 @@ class OnboardingTest extends TestCase
 
         Http::assertSent(function ($request) {
             return str_contains((string) ($request['text'] ?? ''), 'لسا عم نكمّل الإعداد')
-                && str_contains((string) ($request['text'] ?? ''), 'بتحب نذكّرك بأذكار الصباح')
-                && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:time:morning:');
+                && str_contains((string) ($request['text'] ?? ''), 'اخترنالك وقتين')
+                && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:quick:yes');
         });
     }
 

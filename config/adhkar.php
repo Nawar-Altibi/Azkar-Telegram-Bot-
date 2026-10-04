@@ -186,4 +186,18 @@ return [
 
     'morning_presets' => ['05:00', '05:30', '06:00', '06:30', '07:00'],
     'evening_presets' => ['16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00'],
+
+    // Offered as one tap right after the country is chosen.
+    'suggested_times' => [
+        'morning' => '06:00',
+        'evening' => '17:00',
+    ],
+
+    // Local hours [from, to) used only to order the reading menu and mark one choice as "now".
+    // Nothing is hidden outside these windows. Night wraps past midnight.
+    'day_windows' => [
+        'morning' => [4, 12],
+        'evening' => [15, 21],
+        'night' => [21, 4],
+    ],
 ];

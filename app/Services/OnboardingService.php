@@ -83,10 +83,37 @@ class OnboardingService
         $user->awaiting_input = null;
         $user->save();
 
-        return [
-            'text' => __('bot.ask_morning_time'),
-            'reply_markup' => $this->keyboards->timePresets('morning'),
-        ];
+        return $this->quickSetupScreen();
+    }
+
+    /**
+     * Saves the suggested morning and evening times in one tap and finishes setup.
+     *
+     * @return array{text:string,reply_markup:?array}
+     */
+    public function acceptSuggestedTimes(User $user): array
+    {
+        if ($user->onboarding_state !== OnboardingState::WaitingMorningTime || ! filled($user->timezone)) {
+            return $this->screenForState($user);
+        }
+
+        $user->morning_time = ReminderScheduleCalculator::normalizeTime((string) config('adhkar.suggested_times.morning', '06:00'));
+        $user->evening_time = ReminderScheduleCalculator::normalizeTime((string) config('adhkar.suggested_times.evening', '17:00'));
+        $user->awaiting_input = null;
+
+        return $this->finish($user);
+    }
+
+    /**
+     * @return array{text:string,reply_markup:?array}
+     */
+    public function chooseOwnTimes(User $user): array
+    {
+        if ($user->onboarding_state !== OnboardingState::WaitingMorningTime) {
+            return $this->screenForState($user);
+        }
+
+        return $this->morningScreen();
     }
 
     /**
@@ -235,7 +262,7 @@ class OnboardingService
     private function screenForState(User $user): array
     {
         return match ($user->onboarding_state) {
-            OnboardingState::WaitingMorningTime => $this->morningScreen(),
+            OnboardingState::WaitingMorningTime => $this->quickSetupScreen(),
             OnboardingState::WaitingEveningTime => $this->eveningScreen(),
             OnboardingState::WaitingMode => $this->finish($user),
             OnboardingState::Completed => $this->settingsScreen($user),
@@ -262,6 +289,20 @@ class OnboardingService
         return [
             'text' => __('bot.ask_timezone'),
             'reply_markup' => $this->keyboards->timezoneOptions(false),
+        ];
+    }
+
+    /**
+     * @return array{text:string,reply_markup:?array}
+     */
+    private function quickSetupScreen(): array
+    {
+        return [
+            'text' => __('bot.quick_setup', [
+                'morning' => ReminderScheduleCalculator::format12Hour((string) config('adhkar.suggested_times.morning', '06:00')),
+                'evening' => ReminderScheduleCalculator::format12Hour((string) config('adhkar.suggested_times.evening', '17:00')),
+            ]),
+            'reply_markup' => $this->keyboards->quickSetup(),
         ];
     }
 

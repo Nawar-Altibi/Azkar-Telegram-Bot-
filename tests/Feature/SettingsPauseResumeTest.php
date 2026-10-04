@@ -66,7 +66,7 @@ class SettingsPauseResumeTest extends TestCase
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'editMessageText')
-                && str_contains((string) ($request['text'] ?? ''), 'ماذا تريد أن تقرأ')
+                && str_contains((string) ($request['text'] ?? ''), 'شو حابب تقرأ')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'today:morning');
         });
         Http::assertNotSent(fn ($request) => ($request['text'] ?? '') === 'تم');

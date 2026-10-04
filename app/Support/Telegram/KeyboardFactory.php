@@ -159,7 +159,7 @@ class KeyboardFactory
     }
 
     /**
-     * @param  array{prev?:string,next?:string,continue?:string,done?:string,save?:string}  $actions
+     * @param  array{prev?:string,next?:string,switch_to_full?:string,switch_to_short?:string,continue?:string,done?:string,save?:string}  $actions
      * @return array<string, mixed>
      */
     public function readingNav(array $actions): array
@@ -170,6 +170,12 @@ class KeyboardFactory
         }
         if (isset($actions['prev'])) {
             $rows[] = [['text' => '➡️ السابق', 'callback_data' => $actions['prev']]];
+        }
+        if (isset($actions['switch_to_full'])) {
+            $rows[] = [['text' => '📖 بدّل للورد الكامل', 'callback_data' => $actions['switch_to_full']]];
+        }
+        if (isset($actions['switch_to_short'])) {
+            $rows[] = [['text' => '🌿 بدّل للورد المختصر', 'callback_data' => $actions['switch_to_short']]];
         }
         if (isset($actions['save'])) {
             $rows[] = [['text' => '📥 أرسل الورد كاملًا', 'callback_data' => $actions['save']]];
@@ -213,15 +219,30 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function todayMenu(): array
+    /**
+     * @param  string|null  $period  morning, evening or night from DayPeriod; that choice goes first and is marked
+     */
+    public function todayMenu(?string $period = null): array
     {
-        return [
-            'inline_keyboard' => [
-                [['text' => '🌅 أذكار الصباح', 'callback_data' => 'today:morning']],
-                [['text' => '🌙 أذكار المساء', 'callback_data' => 'today:evening']],
-                [['text' => '🌟 أذكار إضافية', 'callback_data' => 'add:list']],
+        $now = ' · ⭐ وقتها هلق';
+        $morning = ['text' => '🌅 أذكار الصباح', 'callback_data' => 'today:morning'];
+        $evening = ['text' => '🌙 أذكار المساء', 'callback_data' => 'today:evening'];
+
+        $choices = match ($period) {
+            'morning' => [['text' => $morning['text'].$now] + $morning, $evening],
+            'evening' => [['text' => $evening['text'].$now] + $evening, $morning],
+            'night' => [
+                ['text' => '🌙 أذكار النوم'.$now, 'callback_data' => 'today:bedtime'],
+                $evening,
+                $morning,
             ],
-        ];
+            default => [$morning, $evening],
+        };
+
+        $rows = array_map(fn (array $button) => [$button], $choices);
+        $rows[] = [['text' => '🌟 أذكار إضافية', 'callback_data' => 'add:list']];
+
+        return ['inline_keyboard' => $rows];
     }
 
     /**
@@ -233,10 +254,24 @@ class KeyboardFactory
         return [
             'inline_keyboard' => [
                 $this->rtl([
-                    ['text' => '🌿 مختصر', 'callback_data' => "rt:{$period}:s:0"],
-                    ['text' => '📖 كامل', 'callback_data' => "rt:{$period}:a:0"],
+                    ['text' => '🌿 مختصر', 'callback_data' => "md:{$period}:s"],
+                    ['text' => '📖 كامل', 'callback_data' => "md:{$period}:a"],
                 ]),
                 [['text' => '🔙 رجوع', 'callback_data' => 'today:menu']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function quickSetup(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '✅ تمام، هيك مناسب', 'callback_data' => 'onb:quick:yes']],
+                [['text' => '⏰ بدي أوقات تانية', 'callback_data' => 'onb:quick:custom']],
+                $this->backOnlyRow(),
             ],
         ];
     }
