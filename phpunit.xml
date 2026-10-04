@@ -34,6 +34,7 @@
         <env name="TELEGRAM_BOT_TOKEN" value="test-token"/>
         <env name="TELEGRAM_WEBHOOK_SECRET" value="test-secret"/>
         <env name="TELEGRAM_DOUBLE_PRESS_SECONDS" value="0"/>
+        <env name="ADHKAR_PDFTOPPM_BINARY" value="pdftoppm-not-installed-in-tests"/>
         <env name="CRON_SECRET" value="test-cron-secret"/>
     </php>
 </phpunit>

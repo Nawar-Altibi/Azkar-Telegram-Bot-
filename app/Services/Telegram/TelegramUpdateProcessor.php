@@ -622,7 +622,7 @@ class TelegramUpdateProcessor
             return;
         }
 
-        if (str_starts_with($data, 'sv:')) {
+        if (str_starts_with($data, 'sv:') || str_starts_with($data, 'sp:')) {
             $this->handleOfflineSave($user, $data, $callbackId);
 
             return;
@@ -822,6 +822,15 @@ class TelegramUpdateProcessor
 
         if ($data === 'settings:keyboard') {
             $this->toggleKeyboardPersistence($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:style') {
+            $user->reminder_style = $user->sendsReadingWithReminder() ? 'nudge' : 'direct';
+            $user->save();
+            $this->events->record($user, 'reminder_style', ['style' => $user->reminder_style]);
+            $this->showSettingsSaved($user, __('bot.reminder_style_'.$user->reminder_style), $messageId);
 
             return;
         }
@@ -1474,9 +1483,14 @@ class TelegramUpdateProcessor
             ? $session['baseKey']
             : $this->content->fullKey($session['baseKey']);
         $this->safeAnswer($callbackId);
+        $fullOnly = $session['phase'] === 'f';
 
         try {
-            $this->sendWirdPdf($user, $headerKey, $items, $session['phase'] === 'f');
+            if (str_starts_with($data, 'sv:')
+                && $this->sendWirdImages($user, $headerKey, $items, $fullOnly, 'sp:'.substr($data, 3))) {
+                return;
+            }
+            $this->sendWirdPdf($user, $headerKey, $items, $fullOnly);
 
             return;
         } catch (Throwable $exception) {
@@ -1498,6 +1512,77 @@ class TelegramUpdateProcessor
             ]);
             $this->reply($user, __('bot.reading_failed'), $this->keyboards->todayShortcut());
         }
+    }
+
+    /**
+     * Sends the wird pages as photos that open inside Telegram, with a button for the printable PDF.
+     *
+     * @param  \Illuminate\Support\Collection<int, AdhkarItem>  $items
+     * @return bool false when page images cannot be made here, so the caller sends the PDF
+     */
+    private function sendWirdImages(User $user, string $collectionKey, $items, bool $fullOnly, string $printCallback): bool
+    {
+        $file = $this->pdf->build($collectionKey, $items, $fullOnly);
+        $pages = $this->pdf->pageImages($file['path']);
+        if ($pages === null) {
+            return false;
+        }
+
+        try {
+            $this->telegram->sendChatAction($user->chat_id, 'upload_photo');
+        } catch (Throwable) {
+            // Only a typing indicator.
+        }
+
+        $caption = __('bot.pdf_album_caption', ['title' => e($file['title'])]);
+        $cacheKey = 'adhkar:page_file_ids:'.$file['hash'];
+        $cached = Cache::get($cacheKey);
+        $fileIds = is_array($cached) && count($cached) === count($pages) ? $cached : null;
+
+        $sent = [];
+        foreach (array_chunk($pages, 10, true) as $chunk) {
+            $photos = [];
+            foreach ($chunk as $i => $path) {
+                $photos[] = $fileIds !== null ? ['file_id' => $fileIds[$i]] : ['path' => $path];
+            }
+            $chunkCaption = $sent === [] ? $caption : '';
+
+            try {
+                $result = $this->sendPhotos($user, $photos, $chunkCaption);
+            } catch (TelegramApiException $exception) {
+                if ($fileIds === null) {
+                    throw $exception;
+                }
+                Cache::forget($cacheKey);
+                $fileIds = null;
+                $result = $this->sendPhotos($user, array_map(fn ($i) => ['path' => $pages[$i]], array_keys($chunk)), $chunkCaption);
+            }
+
+            $messages = isset($result['result']['message_id']) ? [$result['result']] : (array) ($result['result'] ?? []);
+            foreach ($messages as $message) {
+                $photo = collect($message['photo'] ?? [])->last();
+                $sent[] = is_array($photo) ? ($photo['file_id'] ?? null) : null;
+            }
+        }
+
+        if (count($sent) === count($pages) && ! in_array(null, $sent, true)) {
+            Cache::forever($cacheKey, $sent);
+        }
+
+        $this->telegram->sendMessage($user->chat_id, __('bot.pdf_print_hint'), $this->keyboards->printPdf($printCallback));
+
+        return true;
+    }
+
+    /**
+     * @param  array<int, array{path?:string,file_id?:string}>  $photos
+     * @return array<string, mixed>
+     */
+    private function sendPhotos(User $user, array $photos, string $caption): array
+    {
+        return count($photos) === 1
+            ? $this->telegram->sendPhoto($user->chat_id, $photos[0], $caption)
+            : $this->telegram->sendMediaGroup($user->chat_id, $photos, $caption);
     }
 
     /**

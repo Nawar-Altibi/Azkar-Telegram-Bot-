@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\AdhkarItem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
 use Mpdf\Mpdf;
+use Throwable;
 
 class AdhkarPdfService
 {
@@ -46,6 +48,62 @@ class AdhkarPdfService
         }
 
         return ['path' => $path, 'filename' => $filename, 'title' => $title, 'hash' => $hash];
+    }
+
+    /**
+     * PNG pages of a built wird file, rendered once by pdftoppm and cached next to it.
+     *
+     * @return list<string>|null null when pdftoppm is not installed or fails, so the caller sends the PDF instead
+     */
+    public function pageImages(string $pdfPath): ?array
+    {
+        $directory = substr($pdfPath, 0, -4).'-pages';
+        $pages = $this->existingPages($directory);
+        if ($pages !== []) {
+            return $pages;
+        }
+
+        $partial = $directory.'.'.getmypid().'.tmp';
+        File::deleteDirectory($partial);
+        File::ensureDirectoryExists($partial);
+
+        try {
+            $result = Process::timeout(60)->run([
+                (string) config('adhkar.pdftoppm_binary', 'pdftoppm'),
+                '-png',
+                '-r', (string) config('adhkar.page_image_dpi', 150),
+                $pdfPath,
+                $partial.'/page',
+            ]);
+            $pages = $result->successful() ? $this->existingPages($partial) : [];
+        } catch (Throwable) {
+            $pages = [];
+        }
+
+        if ($pages === []) {
+            File::deleteDirectory($partial);
+
+            return null;
+        }
+
+        if (! is_dir($directory) && @rename($partial, $directory)) {
+            return $this->existingPages($directory);
+        }
+        File::deleteDirectory($partial);
+        $pages = $this->existingPages($directory);
+
+        return $pages === [] ? null : $pages;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function existingPages(string $directory): array
+    {
+        $pages = glob($directory.'/page*.png') ?: [];
+        natsort($pages);
+
+        return array_values($pages);
     }
 
     /**

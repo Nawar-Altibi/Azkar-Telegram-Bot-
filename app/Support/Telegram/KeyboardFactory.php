@@ -193,6 +193,14 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
+    public function printPdf(string $callback): array
+    {
+        return ['inline_keyboard' => [[['text' => __('bot.pdf_print_button'), 'callback_data' => $callback]]]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsMenu(User $user): array
     {
         $reminderButton = $user->reminders_enabled
@@ -201,6 +209,9 @@ class KeyboardFactory
         $keyboardButton = ($user->keyboard_persistent ?? true)
             ? ['text' => '⌨️ الأزرار السفلية: ظاهرة دائمًا ✅', 'callback_data' => 'settings:keyboard']
             : ['text' => '⌨️ الأزرار السفلية: أظهرها بنفسي', 'callback_data' => 'settings:keyboard'];
+        $styleButton = $user->sendsReadingWithReminder()
+            ? ['text' => '🔔 التذكير: الأذكار بتوصل مباشرة', 'callback_data' => 'settings:style']
+            : ['text' => '🔔 التذكير: رسالة تنبيه وبختار', 'callback_data' => 'settings:style'];
 
         return [
             'inline_keyboard' => [
@@ -209,6 +220,7 @@ class KeyboardFactory
                     ['text' => '🌅 وقت الصباح', 'callback_data' => 'settings:morning_time'],
                     ['text' => '🌙 وقت المساء', 'callback_data' => 'settings:evening_time'],
                 ]),
+                [$styleButton],
                 [$keyboardButton],
                 [$reminderButton],
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],

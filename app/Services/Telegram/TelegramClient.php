@@ -51,11 +51,67 @@ class TelegramClient
             return $this->call('sendDocument', $payload + ['document' => $fileId]);
         }
 
-        return $this->call('sendDocument', $payload, null, [
+        return $this->call('sendDocument', $payload, null, [[
             'name' => 'document',
             'contents' => (string) file_get_contents($path),
             'filename' => $filename,
+        ]]);
+    }
+
+    /**
+     * Sends 2 to 10 photos as one album. Each entry is a local path to upload, or a file_id from an earlier upload.
+     *
+     * @param  array<int, array{path?:string,file_id?:string}>  $photos
+     */
+    public function sendMediaGroup(int|string $chatId, array $photos, string $caption = ''): array
+    {
+        $media = [];
+        $attachments = [];
+        foreach (array_values($photos) as $i => $photo) {
+            $entry = ['type' => 'photo'];
+            if (isset($photo['file_id'])) {
+                $entry['media'] = $photo['file_id'];
+            } else {
+                $entry['media'] = 'attach://page'.$i;
+                $attachments[] = [
+                    'name' => 'page'.$i,
+                    'contents' => (string) file_get_contents((string) $photo['path']),
+                    'filename' => 'page'.$i.'.png',
+                ];
+            }
+            if ($i === 0 && $caption !== '') {
+                $entry['caption'] = $caption;
+                $entry['parse_mode'] = 'HTML';
+            }
+            $media[] = $entry;
+        }
+
+        return $this->call('sendMediaGroup', [
+            'chat_id' => $chatId,
+            'media' => json_encode($media, JSON_UNESCAPED_UNICODE),
+        ], 60, $attachments);
+    }
+
+    /**
+     * @param  array{path?:string,file_id?:string}  $photo
+     */
+    public function sendPhoto(int|string $chatId, array $photo, string $caption = ''): array
+    {
+        $payload = array_filter([
+            'chat_id' => $chatId,
+            'caption' => $caption !== '' ? $caption : null,
+            'parse_mode' => $caption !== '' ? 'HTML' : null,
         ]);
+
+        if (isset($photo['file_id'])) {
+            return $this->call('sendPhoto', $payload + ['photo' => $photo['file_id']]);
+        }
+
+        return $this->call('sendPhoto', $payload, 60, [[
+            'name' => 'photo',
+            'contents' => (string) file_get_contents((string) $photo['path']),
+            'filename' => 'page.png',
+        ]]);
     }
 
     public function sendChatAction(int|string $chatId, string $action = 'typing'): array
@@ -143,10 +199,10 @@ class TelegramClient
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array{name:string,contents:string,filename:string}|null  $attachment  sent as multipart instead of a form
+     * @param  array<int, array{name:string,contents:string,filename:string}>  $attachments  sent as multipart instead of a form
      * @return array<string, mixed>
      */
-    private function call(string $method, array $payload, ?int $timeoutSeconds = null, ?array $attachment = null): array
+    private function call(string $method, array $payload, ?int $timeoutSeconds = null, array $attachments = []): array
     {
         $token = (string) config('telegram.bot_token');
         if ($token === '') {
@@ -156,9 +212,12 @@ class TelegramClient
         $url = rtrim((string) config('telegram.api_base'), '/').'/bot'.$token.'/'.$method;
 
         $request = Http::timeout($timeoutSeconds ?? (int) config('telegram.timeout', 15))->acceptJson();
-        $request = $attachment === null
-            ? $request->asForm()
-            : $request->attach($attachment['name'], $attachment['contents'], $attachment['filename']);
+        if ($attachments === []) {
+            $request = $request->asForm();
+        }
+        foreach ($attachments as $attachment) {
+            $request = $request->attach($attachment['name'], $attachment['contents'], $attachment['filename']);
+        }
 
         /** @var Response $response */
         $response = $request->post($url, $payload);

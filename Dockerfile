@@ -32,6 +32,7 @@ RUN apt-get update \
         libpq5 \
         libpq-dev \
         nginx \
+        poppler-utils \
         procps \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql pdo_pgsql bcmath opcache gd \

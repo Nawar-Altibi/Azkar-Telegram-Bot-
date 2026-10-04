@@ -74,11 +74,14 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
         }
 
         try {
-            $result = $telegram->sendMessage(
-                $user->chat_id,
-                $content->nudgeText($log->collection_key),
-                $keyboards->reminderNudge($log->id, $log->reminder_type->value),
-            );
+            $direct = $user->sendsReadingWithReminder() ? $this->firstCard($log, $collection, $content, $keyboards) : null;
+            $result = $direct !== null
+                ? $telegram->sendMessage($user->chat_id, $direct['text'], $direct['markup'])
+                : $telegram->sendMessage(
+                    $user->chat_id,
+                    $content->nudgeText($log->collection_key),
+                    $keyboards->reminderNudge($log->id, $log->reminder_type->value),
+                );
 
             $log->refresh();
             $log->update([
@@ -86,6 +89,7 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
                 'sent_at' => now(),
                 'telegram_message_id' => [data_get($result, 'result.message_id')],
                 'error_message' => null,
+                ...($direct['snapshot'] ?? []),
             ]);
         } catch (TelegramApiException $exception) {
             $this->markFailed($log, $user, $exception);
@@ -109,6 +113,46 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
                 : Str::limit($exception?->getMessage() ?? 'job_failed', 1000),
             'retry_count' => $this->attempts(),
         ]);
+    }
+
+    /**
+     * The reminder opens straight on the first card of the wird the user last chose, already claimed for reading.
+     *
+     * @return array{text:string,markup:array<string,mixed>,snapshot:array<string,mixed>}|null
+     */
+    private function firstCard(ReminderLog $log, AdhkarCollection $collection, AdhkarContentService $content, KeyboardFactory $keyboards): ?array
+    {
+        $key = (string) $log->collection_key;
+        $phase = str_contains($key, '_full') ? 'a' : 's';
+        $items = $content->itemsForPhase($key, $phase);
+        if ($items->isEmpty()) {
+            return null;
+        }
+
+        $total = $items->count();
+        $actions = ['save' => 'sv:l:'.$log->id.':'.$phase];
+        if ($total > 1) {
+            $actions['next'] = 'rd:'.$log->id.':'.$phase.':1';
+        } else {
+            $actions['done'] = 'reminder:done:'.$log->id;
+        }
+        if (! $content->isSingleVersion($key)) {
+            $target = $phase === 's' ? 'a' : 's';
+            $actions[$target === 'a' ? 'switch_to_full' : 'switch_to_short'] = 'rsw:'.$log->id.':'.$target;
+        }
+
+        $lead = __(str_starts_with($key, 'evening') ? 'bot.direct_lead_evening' : 'bot.direct_lead_morning');
+        $snapshot = $content->snapshotVersions($collection->items()->where('adhkar_items.active', true)->get());
+
+        return [
+            'text' => $lead."\n\n".$content->renderCard($key, $items[0], 1, $total, $total === 1),
+            'markup' => $keyboards->readingNav($actions),
+            'snapshot' => [
+                'reading_started_at' => now(),
+                'content_version_map' => $snapshot['content_version_map'],
+                'content_snapshot_hash' => $snapshot['content_snapshot_hash'],
+            ],
+        ];
     }
 
     private function reserveOutboundAttempt(ReminderLog $log): bool

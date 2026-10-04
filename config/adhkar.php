@@ -24,6 +24,10 @@ return [
     'cron_count_queries' => (bool) env('ADHKAR_CRON_COUNT_QUERIES', true),
     'inter_message_delay_microseconds' => 50_000,
 
+    // Wird pages are sent as photos when pdftoppm (poppler-utils) is installed, and as a PDF otherwise.
+    'pdftoppm_binary' => env('ADHKAR_PDFTOPPM_BINARY', 'pdftoppm'),
+    'page_image_dpi' => (int) env('ADHKAR_PAGE_IMAGE_DPI', 150),
+
     'timezones' => [
         ['label' => 'سوريا', 'id' => 'Asia/Damascus'],
         ['label' => 'لبنان', 'id' => 'Asia/Beirut'],
