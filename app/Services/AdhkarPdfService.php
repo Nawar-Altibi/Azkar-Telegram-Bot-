@@ -136,13 +136,19 @@ class AdhkarPdfService
             'mode' => 'utf-8',
             'format' => 'A5',
             'directionality' => 'rtl',
-            'fontDir' => [...$fontDirs, resource_path('fonts/amiri')],
+            'fontDir' => [...$fontDirs, resource_path('fonts/amiri'), resource_path('fonts/tajawal')],
             'fontdata' => $fontData + [
                 'amiri' => [
                     'R' => 'Amiri-Regular.ttf',
                     'B' => 'Amiri-Bold.ttf',
                     'useOTL' => 0xFF,
                     'useKashida' => 75,
+                ],
+                // Titles, labels and page furniture; the adhkar themselves stay in Amiri.
+                'tajawal' => [
+                    'R' => 'Tajawal-Medium.ttf',
+                    'B' => 'Tajawal-Bold.ttf',
+                    'useOTL' => 0xFF,
                 ],
             ],
             'default_font' => 'amiri',
@@ -165,6 +171,7 @@ class AdhkarPdfService
             'subtitle' => $this->subtitle($collectionKey, $fullOnly, $items->count()),
             'items' => $items->values(),
             'footer' => $this->content->footerText($collectionKey),
+            'splitAbove' => 200,
             't' => fn (?string $text): string => $this->typeset($text),
         ])->render();
 
@@ -185,6 +192,8 @@ class AdhkarPdfService
         $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]/u', '', $text) ?? $text;
 
         $text = preg_replace(['/[ \t]{2,}/u', '/[ \t]*\n[ \t]*/u'], [' ', "\n"], $text) ?? $text;
+        // Keeps a reference such as "[البقرة: 255]" on one line, so its number cannot wrap away from the name.
+        $text = preg_replace('/:\s(\d)/u', ":\u{00A0}$1", $text) ?? $text;
 
         return trim($text);
     }
