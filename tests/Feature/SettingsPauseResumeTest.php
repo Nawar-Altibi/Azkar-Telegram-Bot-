@@ -120,28 +120,14 @@ class SettingsPauseResumeTest extends TestCase
         $this->assertTrue($user->fresh()->reminders_enabled);
     }
 
-    public function test_keyboard_can_stay_visible_or_be_hidden(): void
+    public function test_settings_menu_has_no_keyboard_visibility_option(): void
     {
-        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
-        $this->assertTrue($user->fresh()->keyboard_persistent);
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
 
-        $this->process($this->telegramCallbackPayload('settings:keyboard', 50));
-        $this->assertFalse($user->fresh()->keyboard_persistent);
-        Http::assertSent(function ($request) {
-            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
+        $this->process($this->telegramMessagePayload('⚙️ الإعدادات', 50));
 
-            return is_array($markup) && isset($markup['keyboard']) && ! isset($markup['is_persistent']);
-        });
-
-        $this->process($this->telegramCallbackPayload('settings:keyboard', 51));
-        $this->assertTrue($user->fresh()->keyboard_persistent);
-        Http::assertSent(function ($request) {
-            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
-
-            return is_array($markup)
-                && ($markup['is_persistent'] ?? false) === true
-                && ($markup['input_field_placeholder'] ?? '') === 'اختر من الأزرار 👇';
-        });
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'settings:follow_up'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'settings:keyboard'));
     }
 
     public function test_reset_asks_before_clearing_the_setup(): void

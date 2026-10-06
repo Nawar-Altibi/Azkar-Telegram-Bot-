@@ -15,7 +15,7 @@ Language: Arabic, in a warm, simple Levantine tone. UI strings live in `lang/ar/
 
 Command descriptions are registered in Arabic with `php artisan telegram:commands:set`.
 
-Reply keyboard, four rows: [🌅 أذكار الصباح، 🌙 أذكار المساء], [☀️ أذكار الاستيقاظ، 🛌 أذكار النوم], [🕌 أذكار الصلاة، 🌟 أذكار إضافية], [⚙️ الإعدادات، ❓ المساعدة والشرح]. Morning and evening open the wird directly (remembered short/full, or the mode choice). It is persistent by default (`users.keyboard_persistent`), with the placeholder «اختر من الأزرار 👇»; the user can turn that off in settings. Old keyboard labels (📖 أذكار اليوم، 🌙 أذكار النوم، 🌅 أذكار الاستيقاظ، مساعدة، شرح البوت، إيقاف التذكير، تفعيل التذكير) still work. Inline rows are reversed so the primary Arabic action sits on the right.
+Reply keyboard, four rows: [🌅 أذكار الصباح، 🌙 أذكار المساء], [☀️ أذكار الاستيقاظ، 🛌 أذكار النوم], [🕌 أذكار الصلاة، 🌟 أذكار إضافية], [⚙️ الإعدادات، ❓ المساعدة والشرح]. Morning and evening open the wird directly (remembered short/full, or the mode choice). It is not persistent: the user hides and shows it with Telegram's keyboard icon next to the input field. The placeholder is «اختر من الأزرار 👇». A returning `/start` resends it. Old keyboard labels (📖 أذكار اليوم، 🌙 أذكار النوم، 🌅 أذكار الاستيقاظ، مساعدة، شرح البوت، إيقاف التذكير، تفعيل التذكير) still work. Inline rows are reversed so the primary Arabic action sits on the right.
 
 ## Setup
 

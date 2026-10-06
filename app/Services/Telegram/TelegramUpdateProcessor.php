@@ -242,22 +242,15 @@ class TelegramUpdateProcessor
     }
 
     /**
-     * A returning user only sees the inline menu on /start, so the bottom buttons stay hidden
-     * until something else sends them. When they are set to stay visible, send them with a short note.
+     * A returning user only sees the inline menu on /start, so the bottom buttons would stay
+     * missing (e.g. in a new chat) until something else sends them.
      */
     private function sendStart(User $user): void
     {
-        $response = $this->onboarding->start($user);
-        $persistent = $user->isOnboarded() && ($user->keyboard_persistent ?? true);
+        $this->sendResponse($user, $this->onboarding->start($user));
 
-        if ($user->isOnboarded() && ! $persistent) {
-            $response['text'] .= "\n\n".__('bot.keyboard_hidden_hint');
-        }
-
-        $this->sendResponse($user, $response);
-
-        if ($persistent) {
-            $this->reply($user, __('bot.keyboard_visible_hint'), $this->keyboards->mainReplyKeyboard($user));
+        if ($user->isOnboarded()) {
+            $this->reply($user, __('bot.keyboard_hint'), $this->keyboards->mainReplyKeyboard($user));
         }
     }
 
@@ -938,12 +931,6 @@ class TelegramUpdateProcessor
 
         if ($data === 'settings:resume' || $data === 'settings:toggle_reminders') {
             $this->handleResume($user, $messageId);
-
-            return;
-        }
-
-        if ($data === 'settings:keyboard') {
-            $this->toggleKeyboardPersistence($user, $messageId);
 
             return;
         }
@@ -1810,20 +1797,6 @@ class TelegramUpdateProcessor
         };
 
         $this->show($user, $text, $markup, $messageId);
-    }
-
-    private function toggleKeyboardPersistence(User $user, ?int $messageId): void
-    {
-        $user->keyboard_persistent = ! ($user->keyboard_persistent ?? true);
-        $user->save();
-        $fresh = $user->fresh() ?? $user;
-
-        $this->sendSettings($fresh, $messageId);
-        $this->reply(
-            $fresh,
-            __($fresh->keyboard_persistent ? 'bot.keyboard_persistent_on' : 'bot.keyboard_persistent_off'),
-            $this->keyboards->mainReplyKeyboard($fresh),
-        );
     }
 
     /**

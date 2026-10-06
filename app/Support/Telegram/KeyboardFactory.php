@@ -244,9 +244,6 @@ class KeyboardFactory
         $reminderButton = $user->reminders_enabled
             ? ['text' => '⏸ إيقاف التذكيرات', 'callback_data' => 'settings:pause_ask']
             : ['text' => '▶️ تشغيل التذكيرات', 'callback_data' => 'settings:resume'];
-        $keyboardButton = ($user->keyboard_persistent ?? true)
-            ? ['text' => '⌨️ الأزرار السفلية: ظاهرة دائمًا ✅', 'callback_data' => 'settings:keyboard']
-            : ['text' => '⌨️ الأزرار السفلية: أظهرها بنفسي', 'callback_data' => 'settings:keyboard'];
         $styleButton = $user->sendsReadingWithReminder()
             ? ['text' => '🔔 التذكير: الأذكار بتوصل مباشرة', 'callback_data' => 'settings:style']
             : ['text' => '🔔 التذكير: رسالة تنبيه وبختار', 'callback_data' => 'settings:style'];
@@ -263,7 +260,6 @@ class KeyboardFactory
                 ]),
                 [$styleButton],
                 [$followUpButton],
-                [$keyboardButton],
                 [$reminderButton],
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],
             ],
@@ -466,7 +462,7 @@ class KeyboardFactory
      */
     public function mainReplyKeyboard(User $user): array
     {
-        $keyboard = [
+        return [
             'keyboard' => [
                 $this->rtl([['text' => '🌅 أذكار الصباح'], ['text' => '🌙 أذكار المساء']]),
                 $this->rtl([['text' => '☀️ أذكار الاستيقاظ'], ['text' => '🛌 أذكار النوم']]),
@@ -474,14 +470,8 @@ class KeyboardFactory
                 $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => '❓ المساعدة والشرح']]),
             ],
             'resize_keyboard' => true,
+            'input_field_placeholder' => 'اختر من الأزرار 👇',
         ];
-
-        if ($user->keyboard_persistent ?? true) {
-            $keyboard['is_persistent'] = true;
-            $keyboard['input_field_placeholder'] = 'اختر من الأزرار 👇';
-        }
-
-        return $keyboard;
     }
 
     /**

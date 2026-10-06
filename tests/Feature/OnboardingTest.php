@@ -282,34 +282,15 @@ class OnboardingTest extends TestCase
         Http::assertSent(function ($request) {
             $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
 
-            return str_contains((string) ($request['text'] ?? ''), 'الأزرار تحت ظاهرة دايمًا')
+            return str_contains((string) ($request['text'] ?? ''), 'أيقونة الأزرار')
                 && is_array($markup)
-                && ($markup['is_persistent'] ?? false) === true;
+                && isset($markup['keyboard'])
+                && ! isset($markup['is_persistent']);
         });
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'سوريا'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin'));
-    }
-
-    public function test_returning_start_explains_a_hidden_keyboard_without_forcing_it_open(): void
-    {
-        User::factory()->create([
-            'telegram_id' => 1001,
-            'chat_id' => 1001,
-            'onboarding_state' => OnboardingState::Completed,
-            'keyboard_persistent' => false,
-        ]);
-
-        $this->process($this->telegramMessagePayload('/start', 1));
-
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الأزرار مخفية هلق')
-            && str_contains((string) ($request['text'] ?? ''), 'أهلاً بعودتك'));
-        Http::assertNotSent(function ($request) {
-            $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
-
-            return is_array($markup) && isset($markup['keyboard']);
-        });
     }
 
     public function test_explain_button_resends_the_guide_without_restarting_setup(): void
