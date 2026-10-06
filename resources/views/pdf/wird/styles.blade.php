@@ -16,7 +16,9 @@ body { font-family: amiri; direction: rtl; color: #1f2a3d; font-size: 12pt; }
 .head { font-family: tajawal; line-height: 2.3; padding-right: 1mm; }
 .num { font-weight: bold; font-size: 9.5pt; color: #fff6e4; background-color: #1d3566; }
 .title { font-weight: bold; font-size: 11.5pt; color: #1d3566; }
-.reps { font-size: 8.5pt; color: #94601c; background-color: #fbecd2; }
+.reps { font-weight: bold; font-size: 11pt; color: #1d2a4a; background-color: #f0b85a; }
+.reps-once { font-size: 8.5pt; color: #8b8676; }
+.reps-note { font-family: tajawal; font-weight: bold; font-size: 9.5pt; color: #94601c; background-color: #fbecd2; border-radius: 1.5mm; padding: 1.2mm 2.5mm; margin-top: 1mm; }
 .text { font-size: 16pt; line-height: 1.9; text-align: justify; color: #1a2233; margin: 0.5mm 0 0 0; }
 .para { margin-top: 2.5mm; }
 /* Only for a card that would not fit on one page at the normal size. */
