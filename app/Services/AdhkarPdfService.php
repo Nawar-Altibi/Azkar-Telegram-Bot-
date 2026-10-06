@@ -8,11 +8,23 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
+use Mpdf\HTMLParserMode;
 use Mpdf\Mpdf;
 use Throwable;
 
 class AdhkarPdfService
 {
+    // A5 height minus the top and bottom margins below.
+    private const PAGE_HEIGHT_MM = 170.0;
+
+    // .entry margin-bottom in the card view; the last card on a page does not need it.
+    private const CARD_GAP_MM = 4.0;
+
+    private const MAX_EXTRA_GAP_MM = 6.0;
+
+    // Steps of smaller card text defined in the styles view (.compact-1, .compact-2).
+    private const MAX_COMPACT = 2;
+
     public function __construct(private readonly AdhkarContentService $content) {}
 
     /**
@@ -22,7 +34,7 @@ class AdhkarPdfService
      */
     public function contentHash(string $collectionKey, Collection $items, bool $fullOnly = false): string
     {
-        $parts = [$collectionKey, $fullOnly ? 'f' : '', md5_file($this->viewPath()), md5_file(__FILE__)];
+        $parts = [$collectionKey, $fullOnly ? 'f' : '', $this->viewsHash(), md5_file(__FILE__)];
         foreach ($items as $item) {
             $parts[] = $item->key.'@'.$item->content_version;
         }
@@ -126,15 +138,132 @@ class AdhkarPdfService
      */
     private function render(string $collectionKey, Collection $items, bool $fullOnly, string $title, string $path): void
     {
+        $heading = $this->content->collectionHeading($collectionKey);
+        $subtitle = $this->subtitle($collectionKey, $fullOnly, $items->count());
+        $t = fn (?string $text): string => $this->typeset($text);
+
+        $css = view('pdf.wird.styles')->render();
+        $cover = view('pdf.wird.cover', ['heading' => $heading, 'subtitle' => $subtitle])->render();
+        $items = $items->values();
+        $card = fn (int $index, int $compact = 0): string => view('pdf.wird.card', [
+            'item' => $items[$index], 'number' => $index + 1, 'compact' => $compact, 't' => $t,
+        ])->render();
+        $cards = $items->keys()->map(fn (int $index): string => $card($index))->all();
+        $closing = view('pdf.wird.closing', ['footer' => $t($this->content->footerText($collectionKey))])->render();
+
+        $heights = $this->measure($css, [$cover, ...$cards, $closing]);
+        $closingHeight = array_pop($heights);
+        $coverHeight = array_shift($heights);
+
+        // A card taller than its page (under the cover, for the first) gets slightly smaller text until it fits whole.
+        foreach ($heights as $index => $height) {
+            $room = self::PAGE_HEIGHT_MM + self::CARD_GAP_MM - ($index === 0 ? $coverHeight : 0.0);
+            for ($compact = 1; $height > $room && $compact <= self::MAX_COMPACT; $compact++) {
+                $cards[$index] = $card($index, $compact);
+                $height = $heights[$index] = $this->measure($css, [$cards[$index]])[0];
+            }
+        }
+
+        $pages = $this->paginate($heights, $coverHeight, $closingHeight);
+
+        $mpdf = $this->mpdf('A5');
+        $mpdf->SetTitle($title);
+        $mpdf->WriteHTML($css, HTMLParserMode::HEADER_CSS);
+        $mpdf->WriteHTML($cover, HTMLParserMode::HTML_BODY);
+        foreach ($pages as $number => $page) {
+            if ($number > 0) {
+                $mpdf->AddPage();
+            }
+            foreach ($page['cards'] as $position => $index) {
+                if ($position > 0 && $page['gap'] > 0) {
+                    $mpdf->Ln($page['gap']);
+                }
+                $mpdf->WriteHTML($cards[$index], HTMLParserMode::HTML_BODY);
+            }
+        }
+        $mpdf->WriteHTML($closing, HTMLParserMode::HTML_BODY);
+
+        // Written next to the final name, then renamed, so a concurrent reader never sees a half file.
+        $partial = $path.'.'.getmypid().'.tmp';
+        $mpdf->Output($partial, 'F');
+        rename($partial, $path);
+    }
+
+    /**
+     * Height in mm of each block, laid out at the real page width on one very tall page.
+     *
+     * @param  list<string>  $blocks
+     * @return list<float>
+     */
+    private function measure(string $css, array $blocks): array
+    {
+        $mpdf = $this->mpdf([148, 5000]);
+        $mpdf->WriteHTML($css, HTMLParserMode::HEADER_CSS);
+        // Opened up front so the first block is not charged the top margin.
+        $mpdf->AddPage();
+
+        $heights = [];
+        foreach ($blocks as $html) {
+            $top = $mpdf->y;
+            $mpdf->WriteHTML($html, HTMLParserMode::HTML_BODY);
+            $heights[] = $mpdf->y - $top;
+        }
+
+        return $heights;
+    }
+
+    /**
+     * Whole cards only: a card that does not fit starts the next page, and the closing always shares a page
+     * with the last card. Leftover space on a full page is shared between its cards, up to a limit.
+     *
+     * @param  list<float>  $heights  card heights, each including its bottom gap
+     * @return list<array{cards: list<int>, gap: float}>
+     */
+    private function paginate(array $heights, float $coverHeight, float $closingHeight): array
+    {
+        $pages = [['cards' => [], 'used' => $coverHeight]];
+        foreach ($heights as $index => $height) {
+            $current = count($pages) - 1;
+            $fits = $pages[$current]['used'] + $height - self::CARD_GAP_MM <= self::PAGE_HEIGHT_MM;
+            if (! $fits && $pages[$current]['cards'] !== []) {
+                $pages[] = ['cards' => [], 'used' => 0.0];
+                $current++;
+            }
+            $pages[$current]['cards'][] = $index;
+            $pages[$current]['used'] += $height;
+        }
+
+        $last = count($pages) - 1;
+        if ($pages[$last]['used'] + $closingHeight > self::PAGE_HEIGHT_MM && count($pages[$last]['cards']) > 1) {
+            $moved = array_pop($pages[$last]['cards']);
+            $pages[$last]['used'] -= $heights[$moved];
+            $pages[] = ['cards' => [$moved], 'used' => $heights[$moved]];
+            $last++;
+        }
+
+        return array_map(function (array $page, int $number) use ($last): array {
+            $gaps = count($page['cards']) - 1;
+            $spare = self::PAGE_HEIGHT_MM - ($page['used'] - self::CARD_GAP_MM);
+            $gap = $number === $last || $gaps < 1 ? 0.0 : min(self::MAX_EXTRA_GAP_MM, max(0.0, $spare - 1) / $gaps);
+
+            return ['cards' => $page['cards'], 'gap' => round($gap, 2)];
+        }, $pages, array_keys($pages));
+    }
+
+    /**
+     * @param  string|array{0: float|int, 1: float|int}  $format
+     */
+    private function mpdf(string|array $format): Mpdf
+    {
         $tempDir = storage_path('app/mpdf');
         File::ensureDirectoryExists($tempDir);
 
         $fontDirs = (new ConfigVariables)->getDefaults()['fontDir'];
         $fontData = (new FontVariables)->getDefaults()['fontdata'];
 
-        $mpdf = new Mpdf([
+        return new Mpdf([
             'mode' => 'utf-8',
-            'format' => 'A5',
+            'format' => $format,
             'directionality' => 'rtl',
             'fontDir' => [...$fontDirs, resource_path('fonts/amiri'), resource_path('fonts/tajawal')],
             'fontdata' => $fontData + [
@@ -163,24 +292,6 @@ class AdhkarPdfService
             'margin_header' => 8,
             'margin_footer' => 8,
         ]);
-        $mpdf->SetTitle($title);
-
-        $html = view('pdf.wird', [
-            'title' => $title,
-            'heading' => $this->content->collectionHeading($collectionKey),
-            'subtitle' => $this->subtitle($collectionKey, $fullOnly, $items->count()),
-            'items' => $items->values(),
-            'footer' => $this->content->footerText($collectionKey),
-            'splitAbove' => 200,
-            't' => fn (?string $text): string => $this->typeset($text),
-        ])->render();
-
-        $mpdf->WriteHTML($html);
-
-        // Written next to the final name, then renamed, so a concurrent reader never sees a half file.
-        $partial = $path.'.'.getmypid().'.tmp';
-        $mpdf->Output($partial, 'F');
-        rename($partial, $path);
     }
 
     /**
@@ -220,8 +331,11 @@ class AdhkarPdfService
         return $wird.' · '.$amount;
     }
 
-    private function viewPath(): string
+    private function viewsHash(): string
     {
-        return resource_path('views/pdf/wird.blade.php');
+        $files = glob(resource_path('views/pdf/wird/*.blade.php')) ?: [];
+        sort($files);
+
+        return md5(implode('|', array_map('md5_file', $files)));
     }
 }

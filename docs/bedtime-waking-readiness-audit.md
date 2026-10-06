@@ -350,7 +350,7 @@ AdhkarCollection::items()  belongsToMany ... withPivot('order') ->orderByPivot('
 AdhkarContentService::collectionItems($key) (active collection, active items) → itemsForPhase / fullOnlyItems
    ▼
 TelegramUpdateProcessor::presentReading → AdhkarContentService::renderCard → formatItem (HTML) → TelegramClient
-AdhkarPdfService::build → resources/views/pdf/wird.blade.php (mPDF, Amiri)
+AdhkarPdfService::build → resources/views/pdf/wird/*.blade.php (mPDF, Amiri)
 ```
 
 ### 6.2 Collections and items (FACT: data files, `ContentSyncService::collectionDefinitions`; local DB matches)
@@ -436,7 +436,7 @@ Scope: add `bedtime` and `waking` as **manually browsable/readable** collections
 | `app/Enums/AdhkarVariant.php`, `app/Enums/AdhkarMode.php` | enums | short/full | Reusable as-is | no change required |
 | `database/migrations/*` | — | generic string columns | No content, pivot or reading-state column is category-specific | **no migration required** |
 | `app/Services/ReminderDispatchService.php`, `app/Jobs/SendAdhkarReminderJob.php`, `app/Services/UserSettingsService.php`, `app/Services/OnboardingService.php`, `app/Models/User.php`, `app/Services/ReminderScheduleCalculator.php` | — | morning/evening reminders | Not touched by manual collections | no change required |
-| `resources/views/pdf/wird.blade.php` | template | receives heading/subtitle/footer | Generic | no change required |
+| `resources/views/pdf/wird/*.blade.php` | template | receives heading/subtitle/footer | Generic | no change required |
 | `docker/entrypoint.sh`, `Dockerfile`, `deploy/*` | — | run `adhkar:sync --if-changed` | Picks up new data automatically (source hash includes data files and `ContentSyncService.php`) | no change required |
 | `resources/adhkar/bedtime.md`, `resources/adhkar/waking.md` (+ `app adhkar/` copies, if that duplication convention is kept) | — | each existing data file names its Markdown source in a docblock | Provenance trail used by the existing content convention | documentation / content |
 | `tests/Unit/ContentSyncServiceTest.php` | `test_sync_is_idempotent…` | asserts morning/evening keys and short ⊂ full | New collections/items need assertions | test |

@@ -59,7 +59,7 @@
 | `adhkar-research.md`, `adhkar_additional.md`, `ar_hisnulmuslim.pdf` | Research/provenance material (not used by code) |
 | `config/adhkar.php` | Timezones, aliases, time presets, additional groups, reminder tuning |
 | `lang/ar/bot.php` | All non-religious UI strings |
-| `resources/views/pdf/wird.blade.php`, `resources/fonts/amiri/` | PDF template and font |
+| `resources/views/pdf/wird/*.blade.php`, `resources/fonts/amiri/` | PDF template and font |
 | `deploy/`, `docker/`, `Dockerfile`, `docker-compose.yml` | Deployment |
 | `docs/` | Prior design docs (several are stale — see §22) |
 
@@ -259,7 +259,7 @@ DB: adhkar_collections, adhkar_items, adhkar_collection_items
         ▼
 AdhkarContentService: collectionKey(), itemsForPhase(), fullOnlyItems(), renderCard(),
                       formatItem(), offlineMessages(), snapshotVersions()
-AdhkarPdfService: build() → storage/app/pdf/*.pdf (mPDF + resources/views/pdf/wird.blade.php)
+AdhkarPdfService: build() → storage/app/pdf/*.pdf (mPDF + resources/views/pdf/wird/*.blade.php)
         ▼
 TelegramUpdateProcessor: presentReading() / additional handlers / handleOfflineSave()
         ▼
@@ -293,7 +293,7 @@ FACT — every item array in `database/data/adhkar/*.php` has these keys (and `A
 | `active` | Optional (default true); `additional.11` is `false` | Filters | Filters |
 | `collections` | List of collection keys; removed before insert and used for the pivot | — | — |
 
-Rendering: `AdhkarContentService::formatItem` and `resources/views/pdf/wird.blade.php`.
+Rendering: `AdhkarContentService::formatItem` and `resources/views/pdf/wird/*.blade.php`.
 
 ### 5.3 Collections / identifiers
 
