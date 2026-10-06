@@ -17,4 +17,6 @@ new_sqlite_classes = ["WakeState"]
 [vars]
 BOT_URL = "https://anees-adhkar-bot.vercel.app"
 
-# CRON_SECRET is a secret: `npx wrangler secret put CRON_SECRET`, same value as the bot's CRON_SECRET.
+# Secrets (`npx wrangler secret put NAME`), each the same value as the bot's env var of that name:
+# CRON_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET.
+# Telegram's webhook points at this Worker: {worker URL}/telegram/webhook/{TELEGRAM_WEBHOOK_SECRET}.

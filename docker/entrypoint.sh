@@ -84,13 +84,16 @@ fi
 
 prepare_app() {
     require_production_database
-    wait_for_database
-    php artisan migrate --force --no-interaction
-    # Full sync only when content/sync logic changed or the database lacks the expected content.
-    php artisan adhkar:sync --if-changed --no-interaction
 
+    if [ "${DB_CONNECTION:-sqlite}" = "mysql" ]; then
+        wait_for_database
+    fi
+
+    # Database wait, migrations, content sync (only when changed) and the config cache, in one PHP process.
     if [ "${APP_ENV:-local}" = "production" ]; then
-        php artisan optimize --no-interaction
+        php artisan adhkar:prepare --cache-config --no-interaction
+    else
+        php artisan adhkar:prepare --no-interaction
     fi
 
     # migrate creates the sqlite file as root; php-fpm runs as www-data.

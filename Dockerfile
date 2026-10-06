@@ -48,6 +48,8 @@ COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/zz-azkar.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/azkar.ini
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
+# Routes, events and views are the same for every start and are cached here with a throwaway key;
+# config needs the runtime env, so the entrypoint caches it.
 RUN ln -sf /etc/nginx/sites-available/azkar.conf /etc/nginx/sites-enabled/azkar.conf \
     && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
@@ -58,6 +60,11 @@ RUN ln -sf /etc/nginx/sites-available/azkar.conf /etc/nginx/sites-enabled/azkar.
         storage/framework/views \
         storage/logs \
         bootstrap/cache \
+    && export APP_KEY="base64:$(head -c 32 /dev/urandom | base64)" \
+    && php artisan route:cache --no-interaction \
+    && php artisan event:cache --no-interaction \
+    && php artisan view:cache --no-interaction \
+    && unset APP_KEY \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwx storage bootstrap/cache
 
