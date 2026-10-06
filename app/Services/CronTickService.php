@@ -7,6 +7,7 @@ use App\Models\ReminderLog;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -22,6 +23,10 @@ class CronTickService
     // A tick is bounded by the claim budget plus one Telegram timeout (~40s) and nginx's 60s upstream
     // timeout; 120s keeps ticks from overlapping while a crashed tick blocks the next ones for at most 2 minutes.
     public const LOCK_SECONDS = 120;
+
+    public const TICK_MARKER_KEY = 'adhkar:last_scheduler_tick';
+
+    public const TICK_MARKER_MINUTES = 5;
 
     private bool $recording = false;
 
@@ -53,6 +58,7 @@ class CronTickService
             'stale_updates_recovered' => 0,
             'follow_ups_sent' => 0,
             'skipped_locked' => false,
+            'idle' => false,
             'ok' => false,
         ];
 
@@ -60,6 +66,16 @@ class CronTickService
         $acquired = false;
 
         try {
+            // Most ticks have nothing to do: answer them with reads only, without the lock or cache writes.
+            // A non-sync queue still needs the drain below, so the shortcut is limited to the sync queue.
+            if (config('queue.default') === 'sync' && ! $this->dispatcher->hasDue() && ! $this->recovery->isDue()) {
+                $this->markTick();
+                $metrics['idle'] = true;
+                $metrics['ok'] = true;
+
+                return $metrics;
+            }
+
             $acquired = (bool) $lock->get();
             if (! $acquired) {
                 $metrics['skipped_locked'] = true;
@@ -74,7 +90,7 @@ class CronTickService
                 $metrics = $this->outcomes($logIds) + $metrics;
             }
 
-            Cache::put('adhkar:last_scheduler_tick', now()->toIso8601String(), now()->addHour());
+            $this->markTick();
 
             // Out of budget: the shared marker stays untouched, so the next tick runs recovery.
             if (hrtime(true) / 1e9 < $deadline) {
@@ -131,6 +147,19 @@ class CronTickService
             'sent_count' => (int) ($counts[ReminderLogStatus::Sent->value] ?? 0),
             'failed_count' => (int) ($counts[ReminderLogStatus::Failed->value] ?? 0),
         ];
+    }
+
+    /**
+     * The marker only tells adhkar:health that ticks arrive, so it is rewritten at most every few minutes.
+     */
+    private function markTick(): void
+    {
+        $last = Cache::get(self::TICK_MARKER_KEY);
+        if (is_string($last) && Carbon::parse($last)->gt(now()->subMinutes(self::TICK_MARKER_MINUTES))) {
+            return;
+        }
+
+        Cache::put(self::TICK_MARKER_KEY, now()->toIso8601String(), now()->addHour());
     }
 
     private function startRecording(): void

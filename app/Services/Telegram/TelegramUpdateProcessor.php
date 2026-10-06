@@ -1603,11 +1603,23 @@ class TelegramUpdateProcessor
      */
     private function sendWirdImages(User $user, string $collectionKey, $items, bool $fullOnly, string $printCallback): bool
     {
-        $file = $this->pdf->build($collectionKey, $items, $fullOnly);
-        $pages = $this->pdf->pageImages($file['path']);
-        if ($pages === null) {
-            return false;
+        // Container disks are wiped on restart while the file ids live in the shared cache,
+        // so pages are rendered only when Telegram has no copy of this exact content.
+        $file = $this->pdf->describe($collectionKey, $items, $fullOnly);
+        $cacheKey = 'adhkar:page_file_ids:'.$file['hash'];
+        $cached = Cache::get($cacheKey);
+        $fileIds = is_array($cached) && $cached !== [] && ! in_array(null, $cached, true) ? array_values($cached) : null;
+        $renderPages = fn () => $this->pdf->pageImages($this->pdf->build($collectionKey, $items, $fullOnly)['path']);
+
+        $pages = null;
+        if ($fileIds === null) {
+            $pages = $renderPages();
+            if ($pages === null) {
+                return false;
+            }
+            $pages = array_values($pages);
         }
+        $pageCount = count($fileIds ?? $pages);
 
         try {
             $this->telegram->sendChatAction($user->chat_id, 'upload_photo');
@@ -1616,16 +1628,13 @@ class TelegramUpdateProcessor
         }
 
         $caption = __('bot.pdf_album_caption', ['title' => e($file['title'])]);
-        $cacheKey = 'adhkar:page_file_ids:'.$file['hash'];
-        $cached = Cache::get($cacheKey);
-        $fileIds = is_array($cached) && count($cached) === count($pages) ? $cached : null;
 
         $sent = [];
-        foreach (array_chunk($pages, 10, true) as $chunk) {
-            $photos = [];
-            foreach ($chunk as $i => $path) {
-                $photos[] = $fileIds !== null ? ['file_id' => $fileIds[$i]] : ['path' => $path];
-            }
+        foreach (array_chunk(range(0, $pageCount - 1), 10) as $chunk) {
+            $photos = array_map(
+                fn (int $i) => $fileIds !== null ? ['file_id' => $fileIds[$i]] : ['path' => $pages[$i]],
+                $chunk,
+            );
             $chunkCaption = $sent === [] ? $caption : '';
 
             try {
@@ -1636,7 +1645,12 @@ class TelegramUpdateProcessor
                 }
                 Cache::forget($cacheKey);
                 $fileIds = null;
-                $result = $this->sendPhotos($user, array_map(fn ($i) => ['path' => $pages[$i]], array_keys($chunk)), $chunkCaption);
+                $pages = $renderPages();
+                if ($pages === null || count($pages) !== $pageCount) {
+                    throw $exception;
+                }
+                $pages = array_values($pages);
+                $result = $this->sendPhotos($user, array_map(fn (int $i) => ['path' => $pages[$i]], $chunk), $chunkCaption);
             }
 
             $messages = isset($result['result']['message_id']) ? [$result['result']] : (array) ($result['result'] ?? []);
@@ -1646,7 +1660,7 @@ class TelegramUpdateProcessor
             }
         }
 
-        if (count($sent) === count($pages) && ! in_array(null, $sent, true)) {
+        if (count($sent) === $pageCount && ! in_array(null, $sent, true)) {
             Cache::forever($cacheKey, $sent);
         }
 
@@ -1671,9 +1685,14 @@ class TelegramUpdateProcessor
      */
     private function sendWirdPdf(User $user, string $collectionKey, $items, bool $fullOnly): void
     {
-        $file = $this->pdf->build($collectionKey, $items, $fullOnly);
+        $file = $this->pdf->describe($collectionKey, $items, $fullOnly);
         $cacheKey = 'adhkar:pdf_file_id:'.$file['hash'];
         $caption = __('bot.pdf_caption', ['title' => e($file['title'])]);
+        $fileId = Cache::get($cacheKey);
+        if (! is_string($fileId) || $fileId === '') {
+            $fileId = null;
+            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
+        }
 
         try {
             $this->telegram->sendChatAction($user->chat_id, 'upload_document');
@@ -1681,7 +1700,6 @@ class TelegramUpdateProcessor
             // Only a typing indicator.
         }
 
-        $fileId = Cache::get($cacheKey);
         try {
             $result = $this->telegram->sendDocument($user->chat_id, $file['path'], $file['filename'], $caption, $fileId);
         } catch (TelegramApiException $exception) {
@@ -1689,6 +1707,7 @@ class TelegramUpdateProcessor
                 throw $exception;
             }
             Cache::forget($cacheKey);
+            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
             $result = $this->telegram->sendDocument($user->chat_id, $file['path'], $file['filename'], $caption);
         }
 

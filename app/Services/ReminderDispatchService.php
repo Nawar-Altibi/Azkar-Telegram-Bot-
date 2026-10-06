@@ -27,6 +27,19 @@ class ReminderDispatchService
         return count($this->claimDueLogIds());
     }
 
+    public function hasDue(): bool
+    {
+        $now = now();
+
+        return User::query()
+            ->where('reminders_enabled', true)
+            ->where(function ($query) use ($now) {
+                $query->where('next_morning_at', '<=', $now)
+                    ->orWhere('next_evening_at', '<=', $now);
+            })
+            ->exists();
+    }
+
     /**
      * Claims due reminders and dispatches their send jobs.
      *

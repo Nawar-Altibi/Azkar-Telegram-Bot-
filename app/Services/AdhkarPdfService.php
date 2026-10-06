@@ -36,18 +36,33 @@ class AdhkarPdfService
      */
     public function build(string $collectionKey, Collection $items, bool $fullOnly = false): array
     {
-        $hash = $this->contentHash($collectionKey, $items, $fullOnly);
-        $title = $this->content->wirdTitle($collectionKey, $fullOnly);
-        $filename = str_replace([' — ', ' '], '-', $title).'.pdf';
-        $directory = storage_path('app/pdf');
-        $path = $directory.'/'.$collectionKey.($fullOnly ? '-extra' : '').'-'.$hash.'.pdf';
+        $file = $this->describe($collectionKey, $items, $fullOnly);
 
-        if (! is_file($path)) {
-            File::ensureDirectoryExists($directory);
-            $this->render($collectionKey, $items, $fullOnly, $title, $path);
+        if (! is_file($file['path'])) {
+            File::ensureDirectoryExists(dirname($file['path']));
+            $this->render($collectionKey, $items, $fullOnly, $file['title'], $file['path']);
         }
 
-        return ['path' => $path, 'filename' => $filename, 'title' => $title, 'hash' => $hash];
+        return $file;
+    }
+
+    /**
+     * Same result as build() without rendering, so a file Telegram already holds is never re-made.
+     *
+     * @param  Collection<int, AdhkarItem>  $items
+     * @return array{path:string,filename:string,title:string,hash:string}
+     */
+    public function describe(string $collectionKey, Collection $items, bool $fullOnly = false): array
+    {
+        $hash = $this->contentHash($collectionKey, $items, $fullOnly);
+        $title = $this->content->wirdTitle($collectionKey, $fullOnly);
+
+        return [
+            'path' => storage_path('app/pdf').'/'.$collectionKey.($fullOnly ? '-extra' : '').'-'.$hash.'.pdf',
+            'filename' => str_replace([' — ', ' '], '-', $title).'.pdf',
+            'title' => $title,
+            'hash' => $hash,
+        ];
     }
 
     /**

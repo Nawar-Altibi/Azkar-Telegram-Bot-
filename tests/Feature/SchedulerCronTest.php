@@ -257,8 +257,9 @@ class SchedulerCronTest extends TestCase
     public function test_tick_failure_returns_500_without_leaking_details_and_releases_the_lock(): void
     {
         Log::spy();
-        $this->mock(ReminderDispatchService::class)
-            ->shouldReceive('claimDueLogIds')
+        $dispatcher = $this->mock(ReminderDispatchService::class);
+        $dispatcher->shouldReceive('hasDue')->andReturn(true);
+        $dispatcher->shouldReceive('claimDueLogIds')
             ->once()
             ->andThrow(new RuntimeException('cURL error for https://api.telegram.org/bottest-token/sendMessage'));
 
@@ -321,10 +322,41 @@ class SchedulerCronTest extends TestCase
             $statements[] = $query->sql;
         });
 
+        Cache::put(CronTickService::TICK_MARKER_KEY, now()->subMinute()->toIso8601String(), now()->addHour());
+        $statements = [];
+
         $this->cron()->assertOk();
 
-        // tick lock insert, due-user select, last-tick upsert, recovery marker read, lock owner check + delete.
-        $this->assertCount(6, $statements, implode("\n", $statements));
+        // due-user exists check, recovery marker read, tick marker read; no lock and no writes.
+        $this->assertCount(3, $statements, implode("\n", $statements));
+        foreach ($statements as $sql) {
+            $this->assertStringStartsWith('select', strtolower($sql));
+        }
+    }
+
+    public function test_idle_tick_refreshes_an_old_tick_marker(): void
+    {
+        Http::fake();
+        Cache::put(CronTickService::TICK_MARKER_KEY, now()->subMinutes(10)->toIso8601String(), now()->addHour());
+
+        $this->cron()->assertOk();
+
+        $this->assertSame(now()->toIso8601String(), Cache::get(CronTickService::TICK_MARKER_KEY));
+    }
+
+    public function test_idle_tick_takes_no_lock(): void
+    {
+        Http::fake();
+        $other = Cache::lock(CronTickService::LOCK_KEY, CronTickService::LOCK_SECONDS);
+        $this->assertTrue($other->get());
+        Log::spy();
+
+        $this->cron()->assertOk();
+
+        Log::shouldHaveReceived('info')->withArgs(
+            fn (string $message, array $context) => $message === 'cron_tick' && $context['idle'] === true && $context['skipped_locked'] === false
+        )->once();
+        $other->release();
     }
 
     public function test_stale_recovery_runs_by_elapsed_time_not_clock_boundary(): void

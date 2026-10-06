@@ -10,6 +10,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\ContentSyncService;
 use App\Services\Telegram\TelegramUpdateProcessor;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -118,6 +119,47 @@ class DirectReminderAndImagesTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument'));
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendMediaGroup'));
+    }
+
+    public function test_a_wiped_disk_reuses_telegram_copies_instead_of_rendering_again(): void
+    {
+        config(['adhkar.pdftoppm_binary' => 'pdftoppm']);
+        Process::fake(function (PendingProcess $process) {
+            $prefix = (string) end($process->command);
+            foreach ([1, 2, 3] as $page) {
+                File::put($prefix.'-'.$page.'.png', 'png'.$page);
+            }
+
+            return Process::result();
+        });
+        // setUp's catch-all fake would answer first, so start from a clean HTTP factory.
+        Http::swap(new HttpFactory(app('events')));
+        Http::fake([
+            'https://api.telegram.org/*/sendMediaGroup' => Http::response(['ok' => true, 'result' => array_map(
+                fn (int $page) => ['message_id' => $page, 'photo' => [['file_id' => 'small'.$page], ['file_id' => 'page'.$page]]],
+                [1, 2, 3],
+            )]),
+            'https://api.telegram.org/*/sendDocument' => Http::response(['ok' => true, 'result' => ['message_id' => 9, 'document' => ['file_id' => 'doc1']]]),
+            'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 5]]),
+        ]);
+        $this->user();
+
+        $this->press('sv:t:m:s', 8);
+        $this->press('sp:t:m:s', 9);
+        Process::assertRanTimes(fn (PendingProcess $process) => true, 1);
+
+        // A new container starts with an empty storage directory.
+        File::cleanDirectory(storage_path('app/pdf'));
+
+        $this->press('sv:t:m:s', 10);
+        $this->press('sp:t:m:s', 11);
+
+        Process::assertRanTimes(fn (PendingProcess $process) => true, 1);
+        $this->assertSame([], glob(storage_path('app/pdf/*.pdf')) ?: []);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMediaGroup')
+            && str_contains((string) ($request['media'] ?? ''), '"page2"'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument')
+            && ($request['document'] ?? null) === 'doc1');
     }
 
     protected function tearDown(): void

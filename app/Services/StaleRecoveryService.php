@@ -65,7 +65,7 @@ class StaleRecoveryService
         ];
     }
 
-    private function isDue(): bool
+    public function isDue(): bool
     {
         $last = Cache::get(self::MARKER_KEY);
         if (! is_numeric($last)) {
