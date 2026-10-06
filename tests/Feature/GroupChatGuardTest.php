@@ -26,7 +26,7 @@ class GroupChatGuardTest extends TestCase
         app(TelegramUpdateProcessor::class)->handle($payload);
 
         $this->assertSame(1001, (int) $user->fresh()->chat_id);
-        Http::assertNothingSent();
+        Http::assertNotSent(fn ($request) => ($request->data()['chat_id'] ?? null) == 1001);
     }
 
     public function test_a_button_pressed_in_a_group_is_ignored(): void

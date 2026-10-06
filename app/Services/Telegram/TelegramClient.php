@@ -154,12 +154,24 @@ class TelegramClient
     /**
      * @param  array<int, array{command:string,description:string}>  $commands
      */
-    public function setMyCommands(array $commands, ?string $languageCode = null): array
+    public function setMyCommands(array $commands, ?string $languageCode = null, ?string $scope = null): array
     {
         return $this->call('setMyCommands', array_filter([
             'commands' => json_encode($commands, JSON_UNESCAPED_UNICODE),
             'language_code' => $languageCode,
+            'scope' => $scope !== null ? json_encode(['type' => $scope]) : null,
         ]));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getChatMember(int|string $chatId, int $userId): array
+    {
+        return $this->call('getChatMember', [
+            'chat_id' => $chatId,
+            'user_id' => $userId,
+        ]);
     }
 
     public function deleteWebhook(): array

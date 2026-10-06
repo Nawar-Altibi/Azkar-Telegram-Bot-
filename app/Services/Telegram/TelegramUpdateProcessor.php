@@ -13,7 +13,6 @@ use App\Models\AdhkarItem;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
-use App\Services\AdhkarPdfService;
 use App\Services\BotEventRecorder;
 use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
@@ -40,7 +39,8 @@ class TelegramUpdateProcessor
         private readonly OnboardingService $onboarding,
         private readonly UserSettingsService $settings,
         private readonly AdhkarContentService $content,
-        private readonly AdhkarPdfService $pdf,
+        private readonly WirdSender $wirds,
+        private readonly GroupChatService $groups,
         private readonly KeyboardFactory $keyboards,
         private readonly BotEventRecorder $events,
     ) {}
@@ -50,17 +50,18 @@ class TelegramUpdateProcessor
      */
     public function handle(array $payload): void
     {
+        // A user's chat_id is where their reminders go, so group updates never reach the per-user flow below.
+        if ($this->groups->isGroupUpdate($payload)) {
+            $this->groups->handle($payload);
+
+            return;
+        }
+
         $update = IncomingUpdate::fromArray($payload);
         $from = $update->from();
         $chatId = $update->chatId();
 
         if ($from === null || $chatId === null) {
-            return;
-        }
-
-        // A user's chat_id is where their reminders go, so a group must never overwrite it.
-        $chatType = data_get($payload, 'message.chat.type') ?? data_get($payload, 'callback_query.message.chat.type');
-        if ($chatType !== null && $chatType !== 'private') {
             return;
         }
 
@@ -1574,10 +1575,10 @@ class TelegramUpdateProcessor
 
         try {
             if (str_starts_with($data, 'sv:')
-                && $this->sendWirdImages($user, $headerKey, $items, $fullOnly, 'sp:'.substr($data, 3))) {
+                && $this->wirds->sendImages($user->chat_id, $headerKey, $items, $fullOnly, 'sp:'.substr($data, 3))) {
                 return;
             }
-            $this->sendWirdPdf($user, $headerKey, $items, $fullOnly);
+            $this->wirds->sendPdf($user->chat_id, $headerKey, $items, $fullOnly);
 
             return;
         } catch (Throwable $exception) {
@@ -1598,128 +1599,6 @@ class TelegramUpdateProcessor
                 'error' => TelegramClient::redact($exception->getMessage()),
             ]);
             $this->reply($user, __('bot.reading_failed'), $this->keyboards->todayShortcut());
-        }
-    }
-
-    /**
-     * Sends the wird pages as photos that open inside Telegram, with a button for the printable PDF.
-     *
-     * @param  Collection<int, AdhkarItem>  $items
-     * @return bool false when page images cannot be made here, so the caller sends the PDF
-     */
-    private function sendWirdImages(User $user, string $collectionKey, $items, bool $fullOnly, string $printCallback): bool
-    {
-        // Container disks are wiped on restart while the file ids live in the shared cache,
-        // so pages are rendered only when Telegram has no copy of this exact content.
-        $file = $this->pdf->describe($collectionKey, $items, $fullOnly);
-        $cacheKey = 'adhkar:page_file_ids:'.$file['hash'];
-        $cached = Cache::get($cacheKey);
-        $fileIds = is_array($cached) && $cached !== [] && ! in_array(null, $cached, true) ? array_values($cached) : null;
-        $renderPages = fn () => $this->pdf->pageImages($this->pdf->build($collectionKey, $items, $fullOnly)['path']);
-
-        $pages = null;
-        if ($fileIds === null) {
-            $pages = $renderPages();
-            if ($pages === null) {
-                return false;
-            }
-            $pages = array_values($pages);
-        }
-        $pageCount = count($fileIds ?? $pages);
-
-        try {
-            $this->telegram->sendChatAction($user->chat_id, 'upload_photo');
-        } catch (Throwable) {
-            // Only a typing indicator.
-        }
-
-        $caption = __('bot.pdf_album_caption', ['title' => e($file['title'])]);
-
-        $sent = [];
-        foreach (array_chunk(range(0, $pageCount - 1), 10) as $chunk) {
-            $photos = array_map(
-                fn (int $i) => $fileIds !== null ? ['file_id' => $fileIds[$i]] : ['path' => $pages[$i]],
-                $chunk,
-            );
-            $chunkCaption = $sent === [] ? $caption : '';
-
-            try {
-                $result = $this->sendPhotos($user, $photos, $chunkCaption);
-            } catch (TelegramApiException $exception) {
-                if ($fileIds === null) {
-                    throw $exception;
-                }
-                Cache::forget($cacheKey);
-                $fileIds = null;
-                $pages = $renderPages();
-                if ($pages === null || count($pages) !== $pageCount) {
-                    throw $exception;
-                }
-                $pages = array_values($pages);
-                $result = $this->sendPhotos($user, array_map(fn (int $i) => ['path' => $pages[$i]], $chunk), $chunkCaption);
-            }
-
-            $messages = isset($result['result']['message_id']) ? [$result['result']] : (array) ($result['result'] ?? []);
-            foreach ($messages as $message) {
-                $photo = collect($message['photo'] ?? [])->last();
-                $sent[] = is_array($photo) ? ($photo['file_id'] ?? null) : null;
-            }
-        }
-
-        if (count($sent) === $pageCount && ! in_array(null, $sent, true)) {
-            Cache::forever($cacheKey, $sent);
-        }
-
-        $this->telegram->sendMessage($user->chat_id, __('bot.pdf_print_hint'), $this->keyboards->printPdf($printCallback));
-
-        return true;
-    }
-
-    /**
-     * @param  array<int, array{path?:string,file_id?:string}>  $photos
-     * @return array<string, mixed>
-     */
-    private function sendPhotos(User $user, array $photos, string $caption): array
-    {
-        return count($photos) === 1
-            ? $this->telegram->sendPhoto($user->chat_id, $photos[0], $caption)
-            : $this->telegram->sendMediaGroup($user->chat_id, $photos, $caption);
-    }
-
-    /**
-     * @param  Collection<int, AdhkarItem>  $items
-     */
-    private function sendWirdPdf(User $user, string $collectionKey, $items, bool $fullOnly): void
-    {
-        $file = $this->pdf->describe($collectionKey, $items, $fullOnly);
-        $cacheKey = 'adhkar:pdf_file_id:'.$file['hash'];
-        $caption = __('bot.pdf_caption', ['title' => e($file['title'])]);
-        $fileId = Cache::get($cacheKey);
-        if (! is_string($fileId) || $fileId === '') {
-            $fileId = null;
-            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
-        }
-
-        try {
-            $this->telegram->sendChatAction($user->chat_id, 'upload_document');
-        } catch (Throwable) {
-            // Only a typing indicator.
-        }
-
-        try {
-            $result = $this->telegram->sendDocument($user->chat_id, $file['path'], $file['filename'], $caption, $fileId);
-        } catch (TelegramApiException $exception) {
-            if ($fileId === null) {
-                throw $exception;
-            }
-            Cache::forget($cacheKey);
-            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
-            $result = $this->telegram->sendDocument($user->chat_id, $file['path'], $file['filename'], $caption);
-        }
-
-        $newFileId = data_get($result, 'result.document.file_id');
-        if (is_string($newFileId) && $newFileId !== '') {
-            Cache::forever($cacheKey, $newFileId);
         }
     }
 

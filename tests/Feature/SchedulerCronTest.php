@@ -328,9 +328,9 @@ class SchedulerCronTest extends TestCase
 
         $this->cron()->assertOk();
 
-        // Tick: due-user exists check, recovery marker read, tick marker read; no lock and no writes.
-        // Wake schedule: next reminder times, next follow-up, pending reminder logs, pending updates.
-        $this->assertCount(7, $statements, implode("\n", $statements));
+        // Tick: due-user and due-group checks, recovery marker read, tick marker read; no lock and no writes.
+        // Wake schedule: next reminder times, next group post, next follow-up, pending reminder logs, pending updates.
+        $this->assertCount(9, $statements, implode("\n", $statements));
         foreach ($statements as $sql) {
             $this->assertStringStartsWith('select', strtolower($sql));
         }

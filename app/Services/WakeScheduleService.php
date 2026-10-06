@@ -13,6 +13,7 @@ class WakeScheduleService
     public function __construct(
         private readonly StaleRecoveryService $recovery,
         private readonly FollowUpReminderService $followUps,
+        private readonly GroupPostService $groupPosts,
     ) {}
 
     /**
@@ -31,6 +32,11 @@ class WakeScheduleService
             if ($value !== null) {
                 $times[] = Carbon::parse($value);
             }
+        }
+
+        $groupPostAt = $this->groupPosts->nextDueAt();
+        if ($groupPostAt !== null) {
+            $times[] = $groupPostAt;
         }
 
         // Follow-ups and recovery only run on recovery's own cadence, so they cannot wake it earlier than that.

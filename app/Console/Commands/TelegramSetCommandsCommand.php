@@ -24,7 +24,14 @@ class TelegramSetCommandsCommand extends Command
         // Telegram shows the default list to everyone whose app language has no list of its own.
         $client->setMyCommands($commands);
         $client->setMyCommands($commands, 'ar');
-        $this->info('Registered '.count($commands).' commands.');
+
+        $groupCommands = collect(__('bot.group_commands'))
+            ->map(fn (string $description, string $command) => ['command' => $command, 'description' => $description])
+            ->values()
+            ->all();
+        $client->setMyCommands($groupCommands, null, 'all_group_chats');
+        $client->setMyCommands($groupCommands, 'ar', 'all_group_chats');
+        $this->info('Registered '.count($commands).' commands and '.count($groupCommands).' group commands.');
 
         return self::SUCCESS;
     }

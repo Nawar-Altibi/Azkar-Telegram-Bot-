@@ -38,6 +38,7 @@ class CronTickService
         private readonly ReminderDispatchService $dispatcher,
         private readonly StaleRecoveryService $recovery,
         private readonly FollowUpReminderService $followUps,
+        private readonly GroupPostService $groupPosts,
     ) {}
 
     /**
@@ -57,6 +58,7 @@ class CronTickService
             'stale_reminders_recovered' => 0,
             'stale_updates_recovered' => 0,
             'follow_ups_sent' => 0,
+            'group_posts' => 0,
             'skipped_locked' => false,
             'idle' => false,
             'ok' => false,
@@ -68,7 +70,7 @@ class CronTickService
         try {
             // Most ticks have nothing to do: answer them with reads only, without the lock or cache writes.
             // A non-sync queue still needs the drain below, so the shortcut is limited to the sync queue.
-            if (config('queue.default') === 'sync' && ! $this->dispatcher->hasDue() && ! $this->recovery->isDue()) {
+            if (config('queue.default') === 'sync' && ! $this->dispatcher->hasDue() && ! $this->groupPosts->hasDue() && ! $this->recovery->isDue()) {
                 $this->markTick();
                 $metrics['idle'] = true;
                 $metrics['ok'] = true;
@@ -89,6 +91,7 @@ class CronTickService
             if ($logIds !== []) {
                 $metrics = $this->outcomes($logIds) + $metrics;
             }
+            $metrics['group_posts'] = $this->groupPosts->postDue($deadline);
 
             $this->markTick();
 

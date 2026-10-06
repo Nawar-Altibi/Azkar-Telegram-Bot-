@@ -371,7 +371,7 @@ class OnboardingTest extends TestCase
             $commands = json_decode((string) ($request['commands'] ?? ''), true);
 
             return str_contains($request->url(), 'setMyCommands')
-                && collect($commands)->firstWhere('command', 'today')['description'] === 'أذكار اليوم';
+                && (collect($commands)->firstWhere('command', 'today')['description'] ?? null) === 'أذكار اليوم';
         });
     }
 
