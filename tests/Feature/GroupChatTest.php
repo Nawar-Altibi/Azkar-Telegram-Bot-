@@ -79,6 +79,70 @@ class GroupChatTest extends TestCase
             && ($request['show_alert'] ?? false));
     }
 
+    public function test_admin_types_a_custom_morning_time_by_replying_to_the_bot(): void
+    {
+        $this->handle($this->membership('left', 'member'));
+        $this->press('g:tz:0', 1);
+
+        $this->press('g:ask:mt', 2);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'force_reply'));
+
+        $this->handle($this->groupMessage('٥:٤٥ الصبح', replyTo: 5));
+
+        $group = GroupChat::query()->firstWhere('chat_id', self::CHAT);
+        $this->assertSame('05:45', $group->morning_time);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), '5:45 صباحًا'));
+    }
+
+    public function test_typing_a_bare_twelve_asks_whether_it_is_noon_or_midnight(): void
+    {
+        $this->handle($this->membership('left', 'member'));
+        $this->press('g:tz:0', 1);
+
+        $this->press('g:ask:et', 2);
+        $this->handle($this->groupMessage('12', replyTo: 5));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'g:et:12:00')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'g:et:00:00'));
+
+        $this->press('g:et:12:00', 3);
+        $this->assertSame('12:00', GroupChat::query()->firstWhere('chat_id', self::CHAT)->evening_time);
+    }
+
+    public function test_admin_types_a_country_and_invalid_input_asks_again(): void
+    {
+        $this->handle($this->membership('left', 'member'));
+
+        $this->press('g:ask:tz', 1);
+        $this->handle($this->groupMessage('كوكب المريخ', replyTo: 5));
+        $this->assertNull(GroupChat::query()->firstWhere('chat_id', self::CHAT)->timezone);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما عرفت'));
+
+        $this->handle($this->groupMessage('تركيا', replyTo: 5));
+        $group = GroupChat::query()->firstWhere('chat_id', self::CHAT);
+        $this->assertSame('Europe/Istanbul', $group->timezone);
+        $this->assertTrue($group->enabled);
+    }
+
+    public function test_replies_from_members_who_are_not_admins_are_refused(): void
+    {
+        $this->handle($this->membership('left', 'member'));
+        $this->press('g:ask:tz', 1);
+
+        $this->memberStatus = 'member';
+        $this->handle($this->groupMessage('تركيا', replyTo: 5, from: 2002));
+
+        $this->assertNull(GroupChat::query()->firstWhere('chat_id', self::CHAT)->timezone);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لمشرفين الغروب'));
+    }
+
+    public function test_ordinary_replies_to_the_bot_are_ignored(): void
+    {
+        $this->handle($this->groupMessage('جزاكم الله خير', replyTo: 999));
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
+    }
+
     public function test_settings_command_for_another_bot_is_ignored(): void
     {
         $this->handle($this->groupMessage('/settings@SomeOtherBot'));
@@ -191,17 +255,19 @@ class GroupChatTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function groupMessage(string $text): array
+    private function groupMessage(string $text, ?int $replyTo = null, int $from = 1001): array
     {
-        return [
-            'update_id' => 9,
-            'message' => [
-                'message_id' => 70,
-                'from' => ['id' => 1001, 'first_name' => 'Admin'],
-                'chat' => ['id' => self::CHAT, 'type' => 'supergroup', 'title' => 'Test'],
-                'text' => $text,
-            ],
+        $message = [
+            'message_id' => 70,
+            'from' => ['id' => $from, 'first_name' => 'Admin'],
+            'chat' => ['id' => self::CHAT, 'type' => 'supergroup', 'title' => 'Test'],
+            'text' => $text,
         ];
+        if ($replyTo !== null) {
+            $message['reply_to_message'] = ['message_id' => $replyTo, 'from' => ['id' => 1, 'is_bot' => true]];
+        }
+
+        return ['update_id' => 9, 'message' => $message];
     }
 
     /**
