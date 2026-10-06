@@ -27,3 +27,4 @@ docs
 npm-debug.log
 yarn-error.log
 ar_hisnulmuslim.pdf
+.env.local
