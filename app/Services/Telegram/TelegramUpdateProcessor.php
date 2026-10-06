@@ -58,6 +58,12 @@ class TelegramUpdateProcessor
             return;
         }
 
+        // A user's chat_id is where their reminders go, so a group must never overwrite it.
+        $chatType = data_get($payload, 'message.chat.type') ?? data_get($payload, 'callback_query.message.chat.type');
+        if ($chatType !== null && $chatType !== 'private') {
+            return;
+        }
+
         $user = $this->findOrCreateUser($from, $chatId);
         $user->last_interaction_at = now();
         $user->save();

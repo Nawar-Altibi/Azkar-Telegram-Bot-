@@ -64,7 +64,8 @@ const authorized = (request, env) => sameSecret(request.headers.get('Authorizati
 
 function messageChatId(body) {
     try {
-        return JSON.parse(body)?.message?.chat?.id;
+        const chat = JSON.parse(body)?.message?.chat;
+        return chat?.type === 'private' ? chat.id : undefined;
     } catch {
         return undefined;
     }
