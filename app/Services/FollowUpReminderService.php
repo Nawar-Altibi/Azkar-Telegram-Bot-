@@ -9,6 +9,8 @@ use App\Models\ReminderLog;
 use App\Services\Telegram\TelegramClient;
 use App\Support\DayPeriod;
 use App\Support\Telegram\KeyboardFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -32,25 +34,52 @@ class FollowUpReminderService
     public function sendDue(): int
     {
         $sent = 0;
-        $logs = ReminderLog::query()
+        $logs = $this->open()
             ->with('user')
-            ->where('status', ReminderLogStatus::Sent)
-            ->whereNull('reading_started_at')
-            ->whereNull('completed_at')
-            ->whereNull('follow_up_sent_at')
-            ->whereBetween('sent_at', [now()->subHours(self::LOOKBACK_HOURS), now()->subMinutes(self::DELAY_MINUTES)])
-            ->whereHas('user', fn ($query) => $query->where('follow_up_enabled', true)->where('reminders_enabled', true))
+            ->where('sent_at', '<=', now()->subMinutes(self::DELAY_MINUTES))
             ->orderBy('id')
             ->limit(self::BATCH)
             ->get();
 
         foreach ($logs as $log) {
-            if ($this->shouldSend($log) && $this->claim($log)) {
+            // Every reason to skip is final once the hour has passed (the user already came back, or the
+            // day or period moved on), so a skipped follow-up is closed too and never re-checked.
+            if (! $this->shouldSend($log)) {
+                $this->claim($log);
+
+                continue;
+            }
+
+            if ($this->claim($log)) {
                 $sent += $this->send($log) ? 1 : 0;
             }
         }
 
         return $sent;
+    }
+
+    /**
+     * When the oldest open follow-up becomes due, or null when none is open.
+     */
+    public function nextDueAt(): ?Carbon
+    {
+        $sentAt = $this->open()->min('sent_at');
+
+        return $sentAt === null ? null : Carbon::parse($sentAt)->addMinutes(self::DELAY_MINUTES);
+    }
+
+    /**
+     * @return Builder<ReminderLog>
+     */
+    private function open(): Builder
+    {
+        return ReminderLog::query()
+            ->where('status', ReminderLogStatus::Sent)
+            ->whereNull('reading_started_at')
+            ->whereNull('completed_at')
+            ->whereNull('follow_up_sent_at')
+            ->where('sent_at', '>=', now()->subHours(self::LOOKBACK_HOURS))
+            ->whereHas('user', fn ($query) => $query->where('follow_up_enabled', true)->where('reminders_enabled', true));
     }
 
     private function shouldSend(ReminderLog $log): bool

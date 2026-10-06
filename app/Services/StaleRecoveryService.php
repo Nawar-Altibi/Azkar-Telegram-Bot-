@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\ReminderLogStatus;
 use App\Enums\TelegramUpdateStatus;
 use App\Jobs\ProcessTelegramUpdateJob;
+use App\Models\ReminderLog;
 use App\Models\TelegramUpdate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -63,6 +65,27 @@ class StaleRecoveryService
             'updates' => $this->recoverTelegramUpdates(),
             'reminders' => $this->dispatcher->recoverStalePending(),
         ];
+    }
+
+    public function nextRunAt(): Carbon
+    {
+        $last = Cache::get(self::MARKER_KEY);
+
+        return is_numeric($last)
+            ? Carbon::createFromTimestamp((int) $last)->addMinutes(self::INTERVAL_MINUTES)
+            : now();
+    }
+
+    /**
+     * Whether a recovery run could still change something: an unconfirmed reminder or an unprocessed update.
+     */
+    public function hasPendingWork(): bool
+    {
+        return ReminderLog::query()->where('status', ReminderLogStatus::Pending)->exists()
+            || TelegramUpdate::query()
+                ->whereIn('status', [TelegramUpdateStatus::Pending, TelegramUpdateStatus::Processing])
+                ->where('attempts', '<', (int) config('adhkar.update_max_attempts', 5))
+                ->exists();
     }
 
     public function isDue(): bool

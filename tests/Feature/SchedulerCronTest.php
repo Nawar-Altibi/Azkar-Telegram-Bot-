@@ -91,7 +91,8 @@ class SchedulerCronTest extends TestCase
 
         $response = $this->cron()->assertOk();
 
-        $this->assertSame(['ok' => true], $response->json());
+        $this->assertSame(['ok', 'next_wake_at', 'computed_at_ms'], array_keys($response->json()));
+        $this->assertTrue($response->json('ok'));
         Http::assertNothingSent();
         $this->assertSame(0, ReminderLog::query()->count());
         $this->assertNotNull(Cache::get('adhkar:last_scheduler_tick'));
@@ -197,7 +198,7 @@ class SchedulerCronTest extends TestCase
         $other = Cache::lock(CronTickService::LOCK_KEY, CronTickService::LOCK_SECONDS);
         $this->assertTrue($other->get());
 
-        $this->cron()->assertOk()->assertExactJson(['ok' => true]);
+        $this->cron()->assertOk()->assertJson(['ok' => true, 'next_wake_at' => $user->next_morning_at->getTimestamp()]);
 
         Http::assertNothingSent();
         $this->assertSame(0, ReminderLog::query()->count());
@@ -327,8 +328,9 @@ class SchedulerCronTest extends TestCase
 
         $this->cron()->assertOk();
 
-        // due-user exists check, recovery marker read, tick marker read; no lock and no writes.
-        $this->assertCount(3, $statements, implode("\n", $statements));
+        // Tick: due-user exists check, recovery marker read, tick marker read; no lock and no writes.
+        // Wake schedule: next reminder times, next follow-up, pending reminder logs, pending updates.
+        $this->assertCount(7, $statements, implode("\n", $statements));
         foreach ($statements as $sql) {
             $this->assertStringStartsWith('select', strtolower($sql));
         }

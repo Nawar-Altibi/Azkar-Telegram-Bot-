@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\WakeGate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -12,7 +13,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(WakeGate::class);
     }
 
     public function boot(): void

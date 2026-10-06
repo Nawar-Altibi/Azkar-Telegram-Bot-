@@ -103,6 +103,18 @@ case "$role" in
         prepare_app
         php-fpm --nodaemonize &
         fpm_pid=$!
+
+        # nginx answers 502 until php-fpm listens, and a cold start's first request arrives as soon as port 80 opens.
+        i=0
+        until php -r 'exit(@fsockopen("127.0.0.1", 9000) ? 0 : 1);'; do
+            if ! kill -0 "$fpm_pid" 2>/dev/null || [ "$i" -ge 100 ]; then
+                echo "php-fpm did not start listening." >&2
+                exit 1
+            fi
+            i=$((i + 1))
+            sleep 0.1
+        done
+
         nginx -g "daemon off;" &
         nginx_pid=$!
 

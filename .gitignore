@@ -24,3 +24,5 @@ yarn-error.log
 
 .vercel
 .env*
+/workers/*/node_modules
+/workers/*/.wrangler

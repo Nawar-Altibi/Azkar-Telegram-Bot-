@@ -39,4 +39,9 @@ return [
         'secret' => env('CRON_SECRET'),
     ],
 
+    // Cloudflare Worker that calls /internal/cron only when work is due. Empty disables the push.
+    'wake_gate' => [
+        'url' => env('WAKE_GATE_URL'),
+    ],
+
 ];

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
 use App\Services\ReminderScheduleCalculator;
+use App\Services\WakeGate;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +56,15 @@ class User extends Model
             'paused_at' => 'datetime',
             'last_interaction_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (User $user) {
+            if ($user->wasChanged(['next_morning_at', 'next_evening_at', 'reminders_enabled', 'follow_up_enabled'])) {
+                app(WakeGate::class)->scheduleChanged();
+            }
+        });
     }
 
     public function reminderLogs(): HasMany
