@@ -6,7 +6,6 @@ use App\Models\Feedback;
 use App\Models\User;
 use App\Services\Telegram\TelegramClient;
 use App\Support\Telegram\TelegramMessage;
-use App\Support\TimezoneCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -117,7 +116,7 @@ class FeedbackService
         }
 
         try {
-            $header = $this->telegram->sendMessage($admin, $this->adminHeader($user, $feedback));
+            $header = $this->telegram->sendMessage($admin, $this->adminHeader($feedback));
             $headerId = data_get($header, 'result.message_id');
             $copy = $this->telegram->copyMessage($admin, $user->chat_id, (int) $feedback->message_id, $headerId !== null
                 ? ['reply_parameters' => json_encode(['message_id' => $headerId, 'allow_sending_without_reply' => true])]
@@ -133,16 +132,9 @@ class FeedbackService
         }
     }
 
-    private function adminHeader(User $user, Feedback $feedback): string
+    private function adminHeader(Feedback $feedback): string
     {
-        $region = $user->timezone_label ?: TimezoneCatalog::labelForTimezone($user->timezone) ?: '—';
-
-        return __('bot.feedback_admin_header', [
-            'id' => $feedback->id,
-            'region' => e($region),
-            'reminders' => __($user->reminders_enabled ? 'bot.reminders_on' : 'bot.reminders_off'),
-            'since' => $user->created_at?->toDateString() ?? '—',
-        ]);
+        return __('bot.feedback_admin_header', ['id' => $feedback->id]);
     }
 
     private function openKey(User $user): string
