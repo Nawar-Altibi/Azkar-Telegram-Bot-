@@ -109,7 +109,8 @@ class BedtimeWakingTest extends TestCase
         $this->assertSame(['🛌 أذكار النوم', '☀️ أذكار الاستيقاظ'], array_column($keyboard['keyboard'][1], 'text'));
         $this->assertSame(['🌟 أذكار إضافية', '🕌 أذكار الصلاة'], array_column($keyboard['keyboard'][2], 'text'));
         $this->assertSame(['❓ المساعدة والشرح', '⚙️ الإعدادات'], array_column($keyboard['keyboard'][3], 'text'));
-        $this->assertCount(4, $keyboard['keyboard']);
+        $this->assertSame(['💬 أرسل ملاحظة أو اقتراحًا'], array_column($keyboard['keyboard'][4], 'text'));
+        $this->assertCount(5, $keyboard['keyboard']);
     }
 
     public function test_bedtime_button_opens_the_first_card_immediately(): void
@@ -140,19 +141,13 @@ class BedtimeWakingTest extends TestCase
         Http::assertNotSent(fn ($r) => str_contains((string) ($r['reply_markup'] ?? ''), 'rt:b:s:'));
     }
 
-    public function test_first_bedtime_reading_offers_the_night_mode_tip_once(): void
+    public function test_bedtime_reading_sends_only_the_card(): void
     {
         $this->user();
         $this->message('🛌 أذكار النوم', 40);
-        $this->message('🛌 أذكار النوم', 41);
 
-        $tips = collect(Http::recorded())->filter(fn ($pair) => str_contains((string) ($pair[0]['text'] ?? ''), 'هل تقرأ في الظلام'));
-        $this->assertCount(1, $tips);
-        $this->assertStringContainsString('help:topic:night', (string) $tips->first()[0]['reply_markup']);
-
-        $this->press('help:topic:night', 42);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الوضع الليلي التلقائي')
-            && str_contains((string) ($request['reply_markup'] ?? ''), 'today:bedtime'));
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'help:topic:night'));
     }
 
     public function test_waking_button_opens_the_first_card_immediately(): void

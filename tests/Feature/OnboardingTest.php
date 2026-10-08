@@ -354,7 +354,7 @@ class OnboardingTest extends TestCase
             return str_contains((string) ($request['text'] ?? ''), 'اختر سؤالك')
                 && str_contains($markup, 'help:topic:font')
                 && str_contains($markup, 'help:topic:missing')
-                && str_contains($markup, 'help:topic:night')
+                && ! str_contains($markup, 'help:topic:night')
                 && str_contains($markup, 'help:topic:style')
                 && str_contains($markup, 'help:topic:groups')
                 && ! str_contains((string) ($request['text'] ?? ''), '/start');

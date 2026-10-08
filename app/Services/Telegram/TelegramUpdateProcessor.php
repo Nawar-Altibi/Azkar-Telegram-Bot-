@@ -360,6 +360,7 @@ class TelegramUpdateProcessor
             'resume' => $this->handleResume($user),
             'help' => $this->showHelpMenu($user, null),
             'explain' => $this->showHelpTopic($user, 'idea', null),
+            'feedback' => $this->startFeedback($user, null),
         };
 
         return true;
@@ -380,6 +381,7 @@ class TelegramUpdateProcessor
             'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
             'مساعدة', '❓ مساعدة', 'المساعدة والشرح', '❓ المساعدة والشرح' => 'help',
             'شرح البوت', '🌿 شرح البوت' => 'explain',
+            'أرسل ملاحظة', '💬 أرسل ملاحظة', 'أرسل ملاحظة أو اقتراحًا', '💬 أرسل ملاحظة أو اقتراحًا' => 'feedback',
             default => null,
         };
     }
@@ -1521,24 +1523,6 @@ class TelegramUpdateProcessor
             'index' => 0,
             'opened' => true,
         ], $messageId);
-
-        if ($period === 'b') {
-            $this->offerNightTipOnce($user);
-        }
-    }
-
-    private function offerNightTipOnce(User $user): void
-    {
-        if ($this->events->hasRecorded($user, 'night_tip')) {
-            return;
-        }
-
-        $this->events->record($user, 'night_tip');
-        try {
-            $this->reply($user, __('bot.night_tip'), $this->keyboards->nightTip());
-        } catch (Throwable) {
-            // The reading itself already went out; the tip is optional.
-        }
     }
 
     /**

@@ -32,7 +32,8 @@ class SettingsPauseResumeTest extends TestCase
         Http::assertSent(function ($request) {
             return str_contains((string) ($request['text'] ?? ''), 'الإعدادات')
                 && ! str_contains((string) ($request['text'] ?? ''), 'الورد:')
-                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:mode');
+                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:mode')
+                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:close');
         });
 
         $this->process($this->telegramCallbackPayload('settings:mode:full', 11));
@@ -55,7 +56,7 @@ class SettingsPauseResumeTest extends TestCase
         $this->assertTrue($user->fresh()->reminders_enabled);
     }
 
-    public function test_settings_back_opens_the_reading_menu(): void
+    public function test_back_button_on_older_settings_messages_opens_the_reading_menu(): void
     {
         User::factory()->create([
             'telegram_id' => 1001,

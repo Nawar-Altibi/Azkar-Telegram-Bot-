@@ -56,7 +56,6 @@ class KeyboardFactory
         } else {
             $action = match ($key) {
                 'read' => ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
-                'night' => ['text' => '🛌 أذكار النوم', 'callback_data' => 'today:bedtime'],
                 'style' => ['text' => '🔔 اختر شكل التذكير', 'callback_data' => 'settings:style'],
                 'time', 'stop', 'missing' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
                 default => null,
@@ -277,7 +276,6 @@ class KeyboardFactory
                 [$styleButton],
                 [$followUpButton],
                 [$reminderButton],
-                [['text' => '🔙 رجوع', 'callback_data' => 'settings:close']],
             ],
         ];
     }
@@ -297,14 +295,6 @@ class KeyboardFactory
                 [['text' => '🔙 رجوع', 'callback_data' => 'settings:open']],
             ],
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function nightTip(): array
-    {
-        return ['inline_keyboard' => [[['text' => __('bot.night_tip_button'), 'callback_data' => 'help:topic:night']]]];
     }
 
     /**
@@ -506,6 +496,7 @@ class KeyboardFactory
                 $this->rtl([['text' => '☀️ أذكار الاستيقاظ'], ['text' => '🛌 أذكار النوم']]),
                 $this->rtl([['text' => '🕌 أذكار الصلاة'], ['text' => '🌟 أذكار إضافية']]),
                 $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => '❓ المساعدة والشرح']]),
+                [['text' => __('bot.feedback_button')]],
             ],
             'resize_keyboard' => true,
             'input_field_placeholder' => 'اختر من الأزرار 👇',

@@ -22,6 +22,19 @@ class FeedbackTest extends TestCase
         ]);
     }
 
+    public function test_bottom_keyboard_button_opens_the_feedback_prompt(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->handle($this->telegramMessagePayload('💬 أرسل ملاحظة أو اقتراحًا', 1));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'شاركنا رأيك')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'feedback:cancel'));
+        $this->assertSame(0, Feedback::query()->count());
+
+        $this->handle($this->telegramMessagePayload('اقتراح', 2));
+        $this->assertSame('اقتراح', Feedback::query()->sole()->text);
+    }
+
     public function test_feedback_reaches_the_admin_and_the_reply_goes_back(): void
     {
         $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001, 'first_name' => 'نوار']);

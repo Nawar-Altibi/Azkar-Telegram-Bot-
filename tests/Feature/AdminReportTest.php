@@ -92,13 +92,13 @@ class AdminReportTest extends TestCase
                 'last_seen_at' => now()->subHours(3),
             ]);
         }
-        BotEvent::query()->create(['user_id' => $user->id, 'event' => 'help_topic', 'meta' => ['topic' => 'night'], 'created_at' => now()]);
+        BotEvent::query()->create(['user_id' => $user->id, 'event' => 'help_topic', 'meta' => ['topic' => 'font'], 'created_at' => now()]);
 
         $report = app(AdminReportService::class)->build(7);
 
         $this->assertStringContainsString('أذكار المساء (كامل): 4 لم يُكملوا · أكثر توقف عند الذكر 3 من 19 (3 منهم)', $report);
         $this->assertStringContainsString('9:00 مساءً (4)', $report);
-        $this->assertStringContainsString('الوضع الليلي لراحة عينيك (1)', $report);
+        $this->assertStringContainsString('كيف أكبّر الخط؟ (1)', $report);
     }
 
     public function test_weekly_report_goes_out_once_on_friday_morning(): void
