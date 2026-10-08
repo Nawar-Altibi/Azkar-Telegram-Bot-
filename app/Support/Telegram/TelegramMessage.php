@@ -18,6 +18,8 @@ final class TelegramMessage
         public readonly ?string $text,
         public readonly string $kind = 'text',
         public readonly ?array $location = null,
+        public readonly ?int $replyToMessageId = null,
+        public readonly ?string $caption = null,
     ) {}
 
     /**
@@ -47,6 +49,8 @@ final class TelegramMessage
             text: $data['text'] ?? null,
             kind: $kind,
             location: $location,
+            replyToMessageId: isset($data['reply_to_message']['message_id']) ? (int) $data['reply_to_message']['message_id'] : null,
+            caption: $data['caption'] ?? null,
         );
     }
 }

@@ -23,6 +23,8 @@ php artisan adhkar:sync
 
 Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in `.env`. Never commit them.
 
+Optionally set `TELEGRAM_ADMIN_CHAT_ID` to your own Telegram chat id (send `/start` to [@userinfobot](https://t.me/userinfobot) to get it). User feedback is copied to that chat, your replies to it reach the user, and `/stats` and the weekly report answer only there. Send `/start` to the bot from that account once, or Telegram will not let the bot message you.
+
 ### Local development
 
 ```bash

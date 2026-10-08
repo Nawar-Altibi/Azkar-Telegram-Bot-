@@ -14,6 +14,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
 use App\Services\BotEventRecorder;
+use App\Services\FeedbackService;
 use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
@@ -21,6 +22,7 @@ use App\Support\DayPeriod;
 use App\Support\IntentMatcher;
 use App\Support\NearestTimezone;
 use App\Support\Telegram\KeyboardFactory;
+use App\Support\Telegram\TelegramMessage;
 use App\Support\Telegram\TelegramUpdate as IncomingUpdate;
 use App\Support\Telegram\TelegramUser;
 use App\Support\TimezoneCatalog;
@@ -43,6 +45,7 @@ class TelegramUpdateProcessor
         private readonly GroupChatService $groups,
         private readonly KeyboardFactory $keyboards,
         private readonly BotEventRecorder $events,
+        private readonly FeedbackService $feedback,
     ) {}
 
     /**
@@ -69,6 +72,10 @@ class TelegramUpdateProcessor
         $user->last_interaction_at = now();
         $user->save();
 
+        if ($update->message !== null && $this->handleFeedbackMessage($user, $update->message)) {
+            return;
+        }
+
         if ($update->callbackQuery) {
             $this->handleCallback($user, $update);
 
@@ -90,6 +97,43 @@ class TelegramUpdateProcessor
         if ($update->message !== null) {
             $this->handleNonTextMessage($user, $update->message->kind);
         }
+    }
+
+    /**
+     * True when the message was feedback from a user, or the owner's reply to one.
+     * Commands and keyboard buttons close an open feedback prompt and work as usual.
+     */
+    private function handleFeedbackMessage(User $user, TelegramMessage $message): bool
+    {
+        if ($this->feedback->isAdminChat($message->chatId) && $this->feedback->relayAdminReply($message)) {
+            return true;
+        }
+
+        if (! $this->feedback->isOpen($user)) {
+            return false;
+        }
+
+        $text = trim((string) $message->text);
+        if ($text !== '' && ($this->extractCommand($text) !== null || $this->keyboardAction($text) !== null)) {
+            $this->feedback->close($user);
+
+            return false;
+        }
+
+        $result = $this->feedback->receive($user, $message);
+        $this->reply(
+            $user,
+            __($result === 'sent' ? 'bot.feedback_thanks' : 'bot.feedback_limited'),
+            $user->isOnboarded() ? $this->keyboards->mainReplyKeyboard($user) : null,
+        );
+
+        return true;
+    }
+
+    private function startFeedback(User $user, ?int $messageId): void
+    {
+        $this->feedback->open($user);
+        $this->show($user, __('bot.feedback_prompt'), $this->keyboards->feedbackPrompt(), $messageId);
     }
 
     private function askForLocation(User $user, string $callbackId): void
@@ -244,6 +288,7 @@ class TelegramUpdateProcessor
             '/pause' => $this->handlePause($user),
             '/resume' => $this->handleResume($user),
             '/today' => $this->showTodayMenu($user, null),
+            '/feedback' => $this->startFeedback($user, null),
             default => $this->reply($user, __('bot.unknown')),
         };
     }
@@ -263,21 +308,7 @@ class TelegramUpdateProcessor
 
     private function handleReplyKeyboard(User $user, string $text): bool
     {
-        $action = match ($text) {
-            'أذكار اليوم', '📖 أذكار اليوم' => 'today',
-            'أذكار الصباح', '🌅 أذكار الصباح' => 'morning',
-            'أذكار المساء', '🌙 أذكار المساء' => 'evening',
-            'أذكار إضافية', '🌟 أذكار إضافية' => 'additional',
-            'أذكار النوم', '🌙 أذكار النوم', '🛌 أذكار النوم' => 'bedtime',
-            'أذكار الاستيقاظ', '🌅 أذكار الاستيقاظ', '☀️ أذكار الاستيقاظ' => 'waking',
-            'أذكار الصلاة', '🕌 أذكار الصلاة', 'أذكار بعد الصلاة', '🕌 أذكار بعد الصلاة' => 'prayer',
-            'الإعدادات', '⚙️ الإعدادات' => 'settings',
-            'إيقاف التذكير', '⏸ إيقاف التذكير' => 'pause',
-            'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
-            'مساعدة', '❓ مساعدة', 'المساعدة والشرح', '❓ المساعدة والشرح' => 'help',
-            'شرح البوت', '🌿 شرح البوت' => 'explain',
-            default => null,
-        };
+        $action = $this->keyboardAction($text);
 
         if ($action === null) {
             return false;
@@ -299,6 +330,25 @@ class TelegramUpdateProcessor
         };
 
         return true;
+    }
+
+    private function keyboardAction(string $text): ?string
+    {
+        return match ($text) {
+            'أذكار اليوم', '📖 أذكار اليوم' => 'today',
+            'أذكار الصباح', '🌅 أذكار الصباح' => 'morning',
+            'أذكار المساء', '🌙 أذكار المساء' => 'evening',
+            'أذكار إضافية', '🌟 أذكار إضافية' => 'additional',
+            'أذكار النوم', '🌙 أذكار النوم', '🛌 أذكار النوم' => 'bedtime',
+            'أذكار الاستيقاظ', '🌅 أذكار الاستيقاظ', '☀️ أذكار الاستيقاظ' => 'waking',
+            'أذكار الصلاة', '🕌 أذكار الصلاة', 'أذكار بعد الصلاة', '🕌 أذكار بعد الصلاة' => 'prayer',
+            'الإعدادات', '⚙️ الإعدادات' => 'settings',
+            'إيقاف التذكير', '⏸ إيقاف التذكير' => 'pause',
+            'استئناف التذكير', '▶️ تفعيل التذكير', '▶️ استئناف التذكير' => 'resume',
+            'مساعدة', '❓ مساعدة', 'المساعدة والشرح', '❓ المساعدة والشرح' => 'help',
+            'شرح البوت', '🌿 شرح البوت' => 'explain',
+            default => null,
+        };
     }
 
     private function handleUnknownText(User $user, string $text): void
@@ -559,6 +609,30 @@ class TelegramUpdateProcessor
 
     private function routeCallback(User $user, string $data, string $callbackId, ?int $messageId): void
     {
+        if ($data === 'feedback:start') {
+            $this->safeAnswer($callbackId);
+            $this->startFeedback($user, $messageId);
+
+            return;
+        }
+
+        if ($this->feedback->isOpen($user)) {
+            $this->feedback->close($user);
+            if ($data === 'feedback:cancel') {
+                $this->safeAnswer($callbackId);
+                $this->show($user, __('bot.feedback_cancelled'), $this->keyboards->helpMenu(), $messageId);
+
+                return;
+            }
+        }
+
+        if ($data === 'feedback:cancel') {
+            $this->safeAnswer($callbackId);
+            $this->showHelpMenu($user, $messageId);
+
+            return;
+        }
+
         if ($data === 'noop') {
             $this->safeAnswer($callbackId);
 

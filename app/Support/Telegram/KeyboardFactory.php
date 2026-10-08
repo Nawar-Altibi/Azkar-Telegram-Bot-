@@ -29,8 +29,17 @@ class KeyboardFactory
         foreach (__('bot.help_topics') as $key => $topic) {
             $rows[] = [['text' => $topic['label'], 'callback_data' => 'help:topic:'.$key]];
         }
+        $rows[] = [['text' => __('bot.feedback_button'), 'callback_data' => 'feedback:start', 'style' => 'success']];
 
         return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function feedbackPrompt(): array
+    {
+        return ['inline_keyboard' => [[['text' => __('bot.feedback_cancel_button'), 'callback_data' => 'feedback:cancel']]]];
     }
 
     /**

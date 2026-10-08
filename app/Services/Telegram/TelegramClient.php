@@ -32,6 +32,18 @@ class TelegramClient
     }
 
     /**
+     * Copies any kind of message (text, voice, photo...) without the "forwarded from" label.
+     */
+    public function copyMessage(int|string $chatId, int|string $fromChatId, int $messageId, array $extra = []): array
+    {
+        return $this->call('copyMessage', [
+            'chat_id' => $chatId,
+            'from_chat_id' => $fromChatId,
+            'message_id' => $messageId,
+        ] + $extra);
+    }
+
+    /**
      * Uploads $path, or resends an earlier upload when $fileId is given.
      */
     public function sendDocument(

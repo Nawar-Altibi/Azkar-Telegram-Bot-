@@ -12,6 +12,7 @@ Language: Arabic, in a warm, simple Levantine tone. UI strings live in `lang/ar/
 | `/help` | The help menu: one button per question. |
 | `/pause` | Pauses at once and shows an undo button. The settings button and typed words ask for confirmation first. |
 | `/resume` | Resumes and shows the saved times. |
+| `/feedback` | Opens the feedback prompt (see Feedback). |
 
 Command descriptions are registered in Arabic with `php artisan telegram:commands:set`.
 
@@ -46,6 +47,12 @@ Rows: region, morning time, evening time, reminder style, follow-up, pause or re
 `❓ المساعدة والشرح` opens one button per question: the idea of the bot, how to read, reminder styles and the follow-up, changing the time, stopping reminders, short vs full, bedtime, waking, prayer and additional adhkar, Telegram's night mode, enlarging the font, adding the bot to a group, and missing reminders. Each answer has a button that leads to the related screen, and «🔙 باقي الأسئلة».
 
 The bot cannot change Telegram's theme, so the night mode answer explains what it does and where to turn it on (the moon in the Android side menu, iPhone dark mode, and the scheduled auto-night mode). The first time a user opens bedtime adhkar, a short tip under the card links to that answer; the `night_tip` event makes it once per user.
+
+## Feedback
+
+The last button of the help menu, `💬 أرسل ملاحظة أو اقتراح` (`feedback:start`), and `/feedback` open a short prompt with `❌ إلغاء` (`feedback:cancel`). The next message, of any kind (text, voice, photo...), is the feedback. The prompt stays open for 30 minutes (a cache key, not `awaiting_input`, so setup steps are untouched). A command, a bottom keyboard button, or any other inline button closes it, and the message then works as usual.
+
+`FeedbackService` stores each one in `feedback` and, when `TELEGRAM_ADMIN_CHAT_ID` is set, sends the owner a header (name, username, Telegram id, region, reminders, join date) followed by `copyMessage` of the user's message as a reply to it. When the owner replies to either message, the reply is copied to the user under «ردّ من فريق البوت على ملاحظتك» and `replied_at` is set; the owner gets a confirmation, or a warning when the user blocked the bot. Other messages from the owner work as usual. Each user can send `TELEGRAM_FEEDBACK_PER_HOUR` (default 5) per hour.
 
 ## Reading
 
