@@ -57,7 +57,8 @@ class SmartReadingTest extends TestCase
         );
 
         $this->handle($this->telegramCallbackPayload('today:bedtime', 4));
-        $this->assertStringStartsWith('🛌 أذكار النوم', $this->lastText());
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+            && str_starts_with((string) ($request['text'] ?? ''), '🛌 أذكار النوم'));
     }
 
     public function test_first_choice_is_remembered_and_can_be_switched(): void

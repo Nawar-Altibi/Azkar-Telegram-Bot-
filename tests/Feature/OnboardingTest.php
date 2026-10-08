@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\OnboardingState;
 use App\Jobs\ProcessTelegramUpdateJob;
+use App\Models\TelegramUpdate;
 use App\Models\User;
 use App\Services\ContentSyncService;
 use Illuminate\Support\Facades\Http;
@@ -335,8 +336,18 @@ class OnboardingTest extends TestCase
             return str_contains((string) ($request['text'] ?? ''), 'اختر سؤالك')
                 && str_contains($markup, 'help:topic:font')
                 && str_contains($markup, 'help:topic:missing')
+                && str_contains($markup, 'help:topic:night')
+                && str_contains($markup, 'help:topic:style')
+                && str_contains($markup, 'help:topic:groups')
                 && ! str_contains((string) ($request['text'] ?? ''), '/start');
         });
+
+        $this->process($this->telegramCallbackPayload('help:topic:style', 6));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الأذكار مباشرة')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:style'));
+
+        $this->process($this->telegramCallbackPayload('help:topic:groups', 7));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ضبط الأوقات'));
 
         $this->process($this->telegramCallbackPayload('help:topic:font', 2));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
@@ -427,7 +438,7 @@ class OnboardingTest extends TestCase
     private function process(array $payload): void
     {
         $this->postWebhook($payload)->assertOk();
-        $record = \App\Models\TelegramUpdate::query()->where('update_id', $payload['update_id'])->first();
+        $record = TelegramUpdate::query()->where('update_id', $payload['update_id'])->first();
         ProcessTelegramUpdateJob::dispatchSync($record->id);
     }
 }

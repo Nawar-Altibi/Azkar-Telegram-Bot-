@@ -6,7 +6,7 @@ Language: Arabic, in a warm, simple Levantine tone. UI strings live in `lang/ar/
 
 | Command | Behavior |
 |---|---|
-| `/start` | New user: a three-line tutorial with `🚀 ابدأ الإعداد` and `💡 شو فكرة البوت؟`. A user already inside setup returns to the current step. A returning user sees a summary, today, help, and an explicit reset that asks for confirmation first. If the bottom keyboard is set to stay visible (the default), `/start` also sends it with a line that says it stays visible and can be hidden from settings. |
+| `/start` | New user: a three-line tutorial with `🚀 ابدأ الإعداد` and `💡 شو فكرة البوت؟`. A user already inside setup returns to the current step. A returning user sees a summary, today, help, and an explicit reset that asks for confirmation first. A returning `/start` also resends the bottom keyboard with a line that says it can be hidden and shown from the keyboard icon. |
 | `/today` | The reading menu (see Reading). |
 | `/settings` | Summary plus one control per row (see Settings). |
 | `/help` | The help menu: one button per question. |
@@ -34,17 +34,18 @@ Typed times are understood the way people say them: «8 المسا»، «6 ون�
 
 ## Settings
 
-Rows: region, morning time, evening time, reminder style, follow-up, bottom keyboard, pause or resume, back.
+Rows: region, morning time, evening time, reminder style, follow-up, pause or resume, back. The summary above them lists region, both times, whether reminders are on, the reminder style, and the follow-up state.
 
-- Reminder style (`users.reminder_style`): `nudge` (default) or `direct`. See Reminders.
+- Reminder style (`users.reminder_style`): `nudge` (default) or `direct`. The `🔔 شكل التذكير: …` button (`settings:style`) opens a screen that explains both styles side by side and marks the current one with ✅. `settings:style:nudge` and `settings:style:direct` save the choice. See Reminders.
 - Follow-up (`users.follow_up_enabled`, off by default). See Follow-up.
-- Bottom keyboard: always shown (default) or shown by the user. Toggling sends a fresh reply keyboard.
 - Pause asks «بدك توقف التذكيرات؟» first. After pausing, an undo button resumes at once.
 - Region changes can also use the location button.
 
 ## Help
 
-`❓ المساعدة والشرح` opens one button per question: the idea of the bot, how to read, changing the time, stopping reminders, short vs full, bedtime and waking, enlarging the font, and missing reminders. Each answer has a button that leads to the related screen, and «🔙 باقي الأسئلة».
+`❓ المساعدة والشرح` opens one button per question: the idea of the bot, how to read, reminder styles and the follow-up, changing the time, stopping reminders, short vs full, bedtime, waking, prayer and additional adhkar, Telegram's night mode, enlarging the font, adding the bot to a group, and missing reminders. Each answer has a button that leads to the related screen, and «🔙 باقي الأسئلة».
+
+The bot cannot change Telegram's theme, so the night mode answer explains what it does and where to turn it on (the moon in the Android side menu, iPhone dark mode, and the scheduled auto-night mode). The first time a user opens bedtime adhkar, a short tip under the card links to that answer; the `night_tip` event makes it once per user.
 
 ## Reading
 

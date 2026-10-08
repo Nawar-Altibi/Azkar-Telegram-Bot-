@@ -44,6 +44,8 @@ class KeyboardFactory
         } else {
             $action = match ($key) {
                 'read' => ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
+                'night' => ['text' => '🛌 أذكار النوم', 'callback_data' => 'today:bedtime'],
+                'style' => ['text' => '🔔 اختار شكل التذكير', 'callback_data' => 'settings:style'],
                 'time', 'stop', 'missing' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
                 default => null,
             };
@@ -244,9 +246,10 @@ class KeyboardFactory
         $reminderButton = $user->reminders_enabled
             ? ['text' => '⏸ إيقاف التذكيرات', 'callback_data' => 'settings:pause_ask']
             : ['text' => '▶️ تشغيل التذكيرات', 'callback_data' => 'settings:resume'];
-        $styleButton = $user->sendsReadingWithReminder()
-            ? ['text' => '🔔 التذكير: الأذكار بتوصل مباشرة', 'callback_data' => 'settings:style']
-            : ['text' => '🔔 التذكير: رسالة تنبيه وبختار', 'callback_data' => 'settings:style'];
+        $styleButton = [
+            'text' => '🔔 شكل التذكير: '.__($user->sendsReadingWithReminder() ? 'bot.style_direct' : 'bot.style_nudge'),
+            'callback_data' => 'settings:style',
+        ];
         $followUpButton = $user->follow_up_enabled
             ? ['text' => '🔁 تذكير تاني إذا نسيت: مشغّل ✅', 'callback_data' => 'settings:follow_up']
             : ['text' => '🔁 تذكير تاني إذا نسيت: مطفي', 'callback_data' => 'settings:follow_up'];
@@ -269,6 +272,28 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
+    public function reminderStyle(User $user): array
+    {
+        $direct = $user->sendsReadingWithReminder();
+        $mark = fn (bool $current) => $current ? '✅ ' : '';
+
+        return [
+            'inline_keyboard' => [
+                [['text' => $mark(! $direct).'📩 '.__('bot.style_nudge'), 'callback_data' => 'settings:style:nudge']],
+                [['text' => $mark($direct).'📖 '.__('bot.style_direct'), 'callback_data' => 'settings:style:direct']],
+                [['text' => '🔙 رجوع', 'callback_data' => 'settings:open']],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function nightTip(): array
+    {
+        return ['inline_keyboard' => [[['text' => __('bot.night_tip_button'), 'callback_data' => 'help:topic:night']]]];
+    }
+
     /**
      * @param  string|null  $period  morning, evening or night from DayPeriod; that choice goes first and is colored
      */

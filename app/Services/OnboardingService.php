@@ -229,6 +229,8 @@ class OnboardingService
             __('bot.summary_morning', ['time' => $user->formattedMorningTime() ?: '—']),
             __('bot.summary_evening', ['time' => $user->formattedEveningTime() ?: '—']),
             __('bot.summary_reminders', ['status' => $reminders]),
+            __('bot.summary_style', ['style' => __($user->sendsReadingWithReminder() ? 'bot.style_direct' : 'bot.style_nudge')]),
+            __('bot.summary_follow_up', ['status' => __($user->follow_up_enabled ? 'bot.follow_up_status_on' : 'bot.follow_up_status_off')]),
         ]);
     }
 

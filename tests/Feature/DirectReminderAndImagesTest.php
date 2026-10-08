@@ -33,11 +33,19 @@ class DirectReminderAndImagesTest extends TestCase
         $user = $this->user();
 
         $this->press('settings:style', 1);
+        $this->assertNotSame('direct', $user->fresh()->reminder_style);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'كيف بدك يوصلك التذكير')
+            && str_contains((string) ($request['text'] ?? ''), 'هلق مختار: <b>رسالة تنبيه</b>')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:style:direct')
+            && str_contains((string) ($request['reply_markup'] ?? ''), '✅ 📩'));
+
+        $this->press('settings:style:direct', 2);
         $this->assertSame('direct', $user->fresh()->reminder_style);
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'رح يوصلك أول ذكر مباشرة')
-            && str_contains((string) ($request['reply_markup'] ?? ''), 'الأذكار بتوصل مباشرة'));
+            && str_contains((string) ($request['text'] ?? ''), 'شكل التذكير: الأذكار مباشرة')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'شكل التذكير: الأذكار مباشرة'));
 
-        $this->press('settings:style', 2);
+        $this->press('settings:style:nudge', 3);
         $this->assertSame('nudge', $user->fresh()->reminder_style);
     }
 
@@ -81,7 +89,7 @@ class DirectReminderAndImagesTest extends TestCase
         SendAdhkarReminderJob::dispatchSync($log->id);
 
         $this->assertNull($log->fresh()->reading_started_at);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اختر الورد'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اختار الورد'));
     }
 
     public function test_full_wird_is_sent_as_photos_with_a_print_button_when_pages_can_be_made(): void

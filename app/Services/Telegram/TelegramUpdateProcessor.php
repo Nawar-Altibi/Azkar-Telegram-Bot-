@@ -961,10 +961,20 @@ class TelegramUpdateProcessor
         }
 
         if ($data === 'settings:style') {
-            $user->reminder_style = $user->sendsReadingWithReminder() ? 'nudge' : 'direct';
-            $user->save();
-            $this->events->record($user, 'reminder_style', ['style' => $user->reminder_style]);
-            $this->showSettingsSaved($user, __('bot.reminder_style_'.$user->reminder_style), $messageId);
+            $current = __($user->sendsReadingWithReminder() ? 'bot.style_direct' : 'bot.style_nudge');
+            $this->show($user, __('bot.style_screen', ['current' => $current]), $this->keyboards->reminderStyle($user), $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:style:nudge' || $data === 'settings:style:direct') {
+            $style = substr($data, strlen('settings:style:'));
+            if ($user->reminder_style !== $style) {
+                $user->reminder_style = $style;
+                $user->save();
+                $this->events->record($user, 'reminder_style', ['style' => $style]);
+            }
+            $this->showSettingsSaved($user, __('bot.reminder_style_'.$style), $messageId);
 
             return;
         }
@@ -1384,6 +1394,24 @@ class TelegramUpdateProcessor
             'phase' => 'a',
             'index' => 0,
         ], $messageId);
+
+        if ($period === 'b') {
+            $this->offerNightTipOnce($user);
+        }
+    }
+
+    private function offerNightTipOnce(User $user): void
+    {
+        if ($this->events->hasRecorded($user, 'night_tip')) {
+            return;
+        }
+
+        $this->events->record($user, 'night_tip');
+        try {
+            $this->reply($user, __('bot.night_tip'), $this->keyboards->nightTip());
+        } catch (Throwable) {
+            // The reading itself already went out; the tip is optional.
+        }
     }
 
     /**
