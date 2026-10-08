@@ -119,7 +119,6 @@ class AdminReportService
         $finished = $this->eventCount('onboarding_completed', $since);
         $activeDay = User::query()->where('last_interaction_at', '>=', now()->subDay())->count();
         $activeWindow = User::query()->where('last_interaction_at', '>=', $since)->count();
-        $remindersOn = User::query()->where('reminders_enabled', true)->count();
 
         $blocked = BotEvent::query()->where('event', 'bot_blocked')->where('created_at', '>=', $since)->pluck('user_id')
             ->merge(ReminderLog::query()->where('error_message', 'blocked_by_user')->where('updated_at', '>=', $since)->pluck('user_id'))
@@ -133,13 +132,20 @@ class AdminReportService
 
         $lines = [
             '👥 <b>المستخدمون</b>',
-            "• الإجمالي: {$total} · الجدد: {$new} · أكملوا الإعداد (منذ البداية): {$onboarded}",
-            "• الإعداد في هذه الفترة: بدأه {$started} · أكمله {$finished} ".$this->pct($finished, $started),
-            "• النشطون: آخر 24 ساعة {$activeDay} · خلال الفترة {$activeWindow}",
-            "• التذكيرات مفعّلة لدى {$remindersOn} · أُوقفت {$this->eventCount('paused', $since)} مرة · حظروا البوت {$blocked}",
+            $this->row('الإجمالي', $total),
+            $this->row('جدد في هذه الفترة', $new),
+            $this->row('نشطون آخر 24 ساعة', $activeDay),
+            $this->row('نشطون خلال الفترة', $activeWindow),
+            $this->row('أكملوا الإعداد (منذ البداية)', $onboarded),
         ];
+        if ($started > 0) {
+            $lines[] = $this->row('أكملوا الإعداد في هذه الفترة', "{$finished} من {$started}", $this->pct($finished, $started));
+        }
         if ($cohortSize > 0) {
-            $lines[] = "• من انضموا في الأيام الـ{$days} السابقة ({$cohortSize}): عادوا في هذه الفترة ".$this->pct($returned, $cohortSize);
+            $lines[] = $this->row("عادوا من جدد الأيام الـ{$days} السابقة", "{$returned} من {$cohortSize}", $this->pct($returned, $cohortSize));
+        }
+        if ($blocked > 0) {
+            $lines[] = $this->row('حظروا البوت', $blocked);
         }
 
         return implode("\n", $lines);
@@ -147,12 +153,27 @@ class AdminReportService
 
     private function remindersSection(Carbon $since): string
     {
+        $onboarded = User::query()->where('onboarding_state', OnboardingState::Completed);
+        $onboardedCount = (clone $onboarded)->count();
+        $direct = (clone $onboarded)->where('reminder_style', 'direct')->count();
+        $followUpOn = (clone $onboarded)->where('follow_up_enabled', true)->count();
+        $paused = $this->eventCount('paused', $since);
+
+        $settings = [
+            $this->row('مفعّلة لدى', User::query()->where('reminders_enabled', true)->count()),
+            $this->row('شكل التذكير', "مباشر {$direct} · تنبيه ".($onboardedCount - $direct)),
+            $this->row('التذكير الثاني مفعّل لدى', $followUpOn),
+        ];
+        if ($paused > 0) {
+            $settings[] = $this->row('مرات إيقاف التذكيرات', $paused);
+        }
+
         $logs = ReminderLog::query()
             ->where('sent_at', '>=', $since)
             ->whereIn('status', [ReminderLogStatus::Sent, ReminderLogStatus::Completed])
             ->get(['id', 'reminder_type', 'sent_at', 'status', 'follow_up_sent_at']);
         if ($logs->isEmpty()) {
-            return "🔔 <b>التذكيرات</b>\n• لم يُرسَل أي تذكير في هذه الفترة.";
+            return implode("\n", ['🔔 <b>التذكيرات</b>', ...$settings, 'لم يُرسَل أي تذكير في هذه الفترة.']);
         }
 
         $openedAt = ReadingSession::query()
@@ -172,24 +193,28 @@ class AdminReportService
 
         $lines = [
             '🔔 <b>التذكيرات</b>',
-            "• أُرسل {$logs->count()} · فُتح {$opened->count()} ".$this->pct($opened->count(), $logs->count())
-                ." · ضغطوا «تم» {$done} ".$this->pct($done, $logs->count()),
+            ...$settings,
+            '',
+            '<i>في هذه الفترة</i>',
+            $this->row('أُرسل', $logs->count()),
+            $this->row('فُتح', $opened->count(), $this->pct($opened->count(), $logs->count())),
+            $this->row('ضغطوا «تم»', $done, $this->pct($done, $logs->count())),
         ];
         foreach ([ReminderType::Morning->value => '🌅 الصباح', ReminderType::Evening->value => '🌙 المساء'] as $type => $label) {
             $ofType = $logs->filter(fn (ReminderLog $log) => $log->reminder_type?->value === $type);
             if ($ofType->isNotEmpty()) {
                 $openedOfType = $ofType->filter(fn (ReminderLog $log) => $openedAt->has($log->id))->count();
-                $lines[] = "• {$label}: فُتح {$openedOfType} من {$ofType->count()} ".$this->pct($openedOfType, $ofType->count());
+                $lines[] = $this->row($label, "فُتح {$openedOfType} من {$ofType->count()}", $this->pct($openedOfType, $ofType->count()));
             }
         }
         if ($minutes->isNotEmpty()) {
-            $lines[] = '• يُفتح عادةً بعد '.$minutes[intdiv($minutes->count(), 2)].' دقيقة من وصوله';
+            $lines[] = $this->row('يُفتح عادةً بعد', $minutes[intdiv($minutes->count(), 2)].' دقيقة');
         }
 
         $followUps = $logs->whereNotNull('follow_up_sent_at');
         if ($followUps->isNotEmpty()) {
             $afterFollowUp = $followUps->filter(fn (ReminderLog $log) => $openedAt->has($log->id) && $openedAt[$log->id]->gte($log->follow_up_sent_at))->count();
-            $lines[] = "• التذكير الثاني: أُرسل {$followUps->count()} · فُتح بعده {$afterFollowUp} ".$this->pct($afterFollowUp, $followUps->count());
+            $lines[] = $this->row('التذكير الثاني', "فُتح بعده {$afterFollowUp} من {$followUps->count()}", $this->pct($afterFollowUp, $followUps->count()));
         }
 
         return implode("\n", $lines);
@@ -201,40 +226,46 @@ class AdminReportService
     private function readingSection(Collection $sessions): string
     {
         if ($sessions->isEmpty()) {
-            return "📖 <b>القراءة</b>\n• لا قراءات في هذه الفترة.";
+            return "📖 <b>القراءة</b>\nلا قراءات في هذه الفترة.";
         }
 
         $fresh = $sessions->where('source', '!=', 'continue');
         $completed = $fresh->whereNotNull('completed_at')->count();
         $lines = [
             '📖 <b>القراءة</b>',
-            "• فُتح ورد {$fresh->count()} مرة · وصلوا إلى آخره {$completed} ".$this->pct($completed, $fresh->count()),
+            $this->row('مرات فتح الورد', $fresh->count()),
+            $this->row('وصلوا إلى آخره', $completed, $this->pct($completed, $fresh->count())),
         ];
+        $continued = $sessions->where('source', 'continue')->count();
+        if ($continued > 0) {
+            $lines[] = $this->row('أكملوا الكامل بعد المختصر', $continued);
+        }
 
+        $lines[] = '';
+        $lines[] = '<i>حسب الورد</i>';
         foreach ($fresh->groupBy(fn (ReadingSession $s) => ReadingSessionRecorder::group($s->collection_key))->sortByDesc(fn (Collection $g) => $g->count()) as $group => $ofGroup) {
-            $line = '• '.$this->content->collectionHeading((string) $group).": {$ofGroup->count()} · أكملوه ".$this->pct($ofGroup->whereNotNull('completed_at')->count(), $ofGroup->count());
+            $line = $this->item($this->content->collectionHeading((string) $group), $ofGroup->count())
+                .' · أكملوه '.$this->percent($ofGroup->whereNotNull('completed_at')->count(), $ofGroup->count());
             $full = $ofGroup->filter(fn (ReadingSession $s) => str_ends_with($s->collection_key, '_full'))->count();
             if ($full > 0 || $ofGroup->contains(fn (ReadingSession $s) => str_ends_with($s->collection_key, '_short'))) {
-                $line .= ' · كامل '.$this->pct($full, $ofGroup->count());
+                $line .= ' · الكامل '.$this->percent($full, $ofGroup->count());
             }
             $lines[] = $line;
         }
 
-        $continued = $sessions->where('source', 'continue')->count();
-        if ($continued > 0) {
-            $lines[] = "• أكملوا الورد الكامل بعد المختصر: {$continued}";
+        $lines[] = '';
+        $lines[] = '<i>من أين يفتحون الورد</i>';
+        foreach (['reminder' => 'من التذكير', 'direct' => 'تذكير مباشر', 'manual' => 'من الأزرار'] as $source => $label) {
+            $lines[] = $this->item($label, $this->percent($fresh->where('source', $source)->count(), $fresh->count()));
         }
-
-        $sources = ['reminder' => 'من التذكير', 'direct' => 'تذكير مباشر', 'manual' => 'من الأزرار'];
-        $lines[] = '• مصدر الفتح: '.collect($sources)
-            ->map(fn (string $label, string $source) => $label.' '.$this->pct($fresh->where('source', $source)->count(), $fresh->count()))
-            ->implode(' · ');
 
         $hours = $fresh->whereNotNull('local_hour')->countBy('local_hour')->sortDesc()->take(3);
         if ($hours->isNotEmpty()) {
-            $lines[] = '• أكثر ساعات القراءة (على توقيتهم): '.$hours
-                ->map(fn (int $n, int $hour) => ReminderScheduleCalculator::format12Hour(sprintf('%02d:00', $hour))." ({$n})")
-                ->implode(' · ');
+            $lines[] = '';
+            $lines[] = '<i>أكثر ساعات القراءة (على توقيتهم)</i>';
+            foreach ($hours as $hour => $n) {
+                $lines[] = $this->item(ReminderScheduleCalculator::format12Hour(sprintf('%02d:00', $hour)), $n);
+            }
         }
 
         return implode("\n", $lines);
@@ -263,8 +294,9 @@ class AdminReportService
             $stops = $group->countBy('furthest')->sortDesc();
             $card = (int) $stops->keys()->first();
             $average = (int) round($group->avg(fn (ReadingSession $s) => $s->furthest / max(1, $s->total)) * 100);
-            $lines[] = '• '.$this->collectionLabel($first)
-                .": {$group->count()} لم يُكملوا · أكثر توقف عند الذكر {$card} من {$first->total} ({$stops->first()} منهم) · وصلوا في المتوسط إلى {$average}%";
+            $lines[] = $this->item($this->collectionLabel($first), $group->count()).' لم يُكملوه';
+            $lines[] = "      أكثر توقف عند الذكر {$card} من {$first->total} ({$stops->first()} منهم)";
+            $lines[] = "      وصلوا في المتوسط إلى {$average}%";
         }
 
         return implode("\n", $lines);
@@ -272,41 +304,41 @@ class AdminReportService
 
     private function usageSection(Carbon $since): string
     {
-        $lines = ['🌟 <b>استخدامات أخرى</b>'];
-
-        $additional = $this->topMeta('additional_item', 'item', $since, 3);
-        if ($additional !== []) {
-            $lines[] = '• أكثر الأذكار الإضافية: '.implode(' · ', $additional);
-        }
+        $feedback = Feedback::query()->where('created_at', '>=', $since)->count();
+        $unanswered = Feedback::query()->whereNull('replied_at')->count();
+        $groups = GroupChat::query()->where('bot_member', true);
+        $lines = [
+            '🌟 <b>استخدامات أخرى</b>',
+            $this->row('💬 ملاحظات جديدة', $feedback),
+            $this->row('💬 ملاحظات بلا رد (الكل)', $unanswered),
+            $this->row('👥 المجموعات المفعّلة', (clone $groups)->where('enabled', true)->count().' من '.(clone $groups)->count()),
+        ];
 
         $saved = BotEvent::query()->where('event', 'wird_saved')->where('created_at', '>=', $since)->get(['meta']);
         if ($saved->isNotEmpty()) {
-            $lines[] = "• طُلب الورد كاملًا {$saved->count()} مرة (صور ".$saved->where('meta.format', 'images')->count()
-                .' · PDF '.$saved->where('meta.format', 'pdf')->count().')';
+            $lines[] = $this->row('📥 مرات طلب الورد كاملًا', $saved->count())
+                .' (صور '.$saved->where('meta.format', 'images')->count().' · PDF '.$saved->where('meta.format', 'pdf')->count().')';
+        }
+
+        $unclear = $this->eventCount(BotEventRecorder::UNKNOWN_TEXT, $since);
+        if ($unclear > 0) {
+            $lines[] = $this->row('❔ رسائل لم يفهمها البوت', $unclear).' (التفاصيل في bot:stats)';
+        }
+
+        $additional = $this->topMeta('additional_item', 'item', $since, 3);
+        if ($additional !== []) {
+            $lines[] = '';
+            $lines[] = '<i>أكثر الأذكار الإضافية فتحًا</i>';
+            array_push($lines, ...$additional);
         }
 
         $topics = __('bot.help_topics');
         $help = $this->topMeta('help_topic', 'topic', $since, 3, fn (string $key) => $topics[$key]['label'] ?? $key);
         if ($help !== []) {
-            $lines[] = '• أكثر أسئلة المساعدة: '.implode(' · ', $help);
+            $lines[] = '';
+            $lines[] = '<i>أكثر أسئلة المساعدة</i>';
+            array_push($lines, ...$help);
         }
-
-        $onboarded = User::query()->where('onboarding_state', OnboardingState::Completed);
-        $direct = (clone $onboarded)->where('reminder_style', 'direct')->count();
-        $followUp = (clone $onboarded)->where('follow_up_enabled', true)->count();
-        $lines[] = "• شكل التذكير: مباشر {$direct} · تنبيه ".((clone $onboarded)->count() - $direct)." · التذكير الثاني مفعّل لدى {$followUp}";
-
-        $unclear = $this->eventCount(BotEventRecorder::UNKNOWN_TEXT, $since);
-        if ($unclear > 0) {
-            $lines[] = "• رسائل لم يفهمها البوت: {$unclear} (التفاصيل في bot:stats)";
-        }
-
-        $feedback = Feedback::query()->where('created_at', '>=', $since)->count();
-        $unanswered = Feedback::query()->whereNull('replied_at')->count();
-        $lines[] = "• 💬 ملاحظات جديدة: {$feedback} · دون رد (الإجمالي): {$unanswered}";
-
-        $groups = GroupChat::query()->where('bot_member', true);
-        $lines[] = '• 👥 المجموعات: '.(clone $groups)->where('enabled', true)->count().' مفعّلة من '.(clone $groups)->count();
 
         return implode("\n", $lines);
     }
@@ -337,9 +369,24 @@ class AdminReportService
             ->countBy()
             ->sortDesc()
             ->take($limit)
-            ->map(fn (int $n, string $value) => e($label !== null ? $label($value) : $value)." ({$n})")
+            ->map(fn (int $n, string $value) => $this->item(e($label !== null ? $label($value) : $value), $n))
             ->values()
             ->all();
+    }
+
+    private function row(string $label, int|string $value, string $suffix = ''): string
+    {
+        return rtrim("{$label}: <b>{$value}</b> {$suffix}");
+    }
+
+    private function item(string $label, int|string $value): string
+    {
+        return "▫️ {$label} — <b>{$value}</b>";
+    }
+
+    private function percent(int $part, int $whole): string
+    {
+        return $whole > 0 ? (int) round($part * 100 / $whole).'%' : '—';
     }
 
     private function eventCount(string $event, Carbon $since): int

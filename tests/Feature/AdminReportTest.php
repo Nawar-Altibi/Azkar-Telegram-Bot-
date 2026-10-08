@@ -96,9 +96,9 @@ class AdminReportTest extends TestCase
 
         $report = app(AdminReportService::class)->build(7);
 
-        $this->assertStringContainsString('أذكار المساء (كامل): 4 لم يُكملوا · أكثر توقف عند الذكر 3 من 19 (3 منهم)', $report);
-        $this->assertStringContainsString('9:00 مساءً (4)', $report);
-        $this->assertStringContainsString('كيف أكبّر الخط؟ (1)', $report);
+        $this->assertStringContainsString("أذكار المساء (كامل) — <b>4</b> لم يُكملوه\n      أكثر توقف عند الذكر 3 من 19 (3 منهم)", $report);
+        $this->assertStringContainsString('9:00 مساءً — <b>4</b>', $report);
+        $this->assertStringContainsString('كيف أكبّر الخط؟ — <b>1</b>', $report);
     }
 
     public function test_weekly_report_goes_out_once_on_friday_morning(): void
