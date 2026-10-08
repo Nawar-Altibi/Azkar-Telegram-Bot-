@@ -137,7 +137,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertStringNotContainsString('💡', $text);
 
-        $this->assertSame([['text' => '⬅️ التالي', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
+        $this->assertSame([['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
         $this->assertSame('sv:t:b:a', $markup['inline_keyboard'][1][0]['callback_data']);
         $this->assertSame('📥 أرسل الورد كاملًا', $markup['inline_keyboard'][1][0]['text']);
         $this->assertCount(2, $markup['inline_keyboard']);
@@ -210,8 +210,8 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringContainsString('💡 الفضل', (string) $request['text']);
         // One row read right to left: previous on the right, next on the left.
         $this->assertSame([
-            ['text' => '⬅️ التالي', 'callback_data' => 'rt:b:a:2'],
-            ['text' => 'السابق ➡️', 'callback_data' => 'rt:b:a:0'],
+            ['text' => 'التالي ⬅️', 'callback_data' => 'rt:b:a:2'],
+            ['text' => '➡️ السابق', 'callback_data' => 'rt:b:a:0'],
         ], $rows[0]);
 
         $this->press('rt:b:a:0', 41);

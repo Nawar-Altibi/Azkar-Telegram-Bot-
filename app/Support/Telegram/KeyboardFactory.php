@@ -217,8 +217,8 @@ class KeyboardFactory
     {
         $rows = [];
         $steps = $this->rtl(array_values(array_filter([
-            isset($actions['prev']) ? ['text' => 'السابق ➡️', 'callback_data' => $actions['prev']] : null,
-            isset($actions['next']) ? ['text' => '⬅️ التالي', 'callback_data' => $actions['next']] : null,
+            isset($actions['prev']) ? ['text' => '➡️ السابق', 'callback_data' => $actions['prev']] : null,
+            isset($actions['next']) ? ['text' => 'التالي ⬅️', 'callback_data' => $actions['next']] : null,
         ])));
         if ($steps !== []) {
             $rows[] = $steps;
