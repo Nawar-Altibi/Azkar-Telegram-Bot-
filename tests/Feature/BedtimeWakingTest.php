@@ -68,6 +68,8 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringContainsString('رَبِّ اغْفِرْ لِي', $texts);
         $this->assertStringNotContainsString('اخْتِلَافِ اللَّيْلِ', $texts);
         $this->assertSame('3878', AdhkarItem::query()->where('key', 'waking.03')->value('hadith_number'));
+        $this->assertStringContainsString("الْعَظِيمِ.\n\nرَبِّ اغْفِرْ لِي", AdhkarItem::query()->where('key', 'waking.03')->value('arabic_text'));
+        $this->assertSame([], AdhkarItem::query()->pluck('arabic_text', 'key')->filter(fn (?string $text) => str_contains((string) $text, '\n'))->keys()->all());
     }
 
     public function test_repetitions_and_sources_are_preserved(): void
