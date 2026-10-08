@@ -33,7 +33,8 @@ class SettingsPauseResumeTest extends TestCase
             return str_contains((string) ($request['text'] ?? ''), 'الإعدادات')
                 && ! str_contains((string) ($request['text'] ?? ''), 'الورد:')
                 && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:mode')
-                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:close');
+                && ! str_contains((string) ($request['reply_markup'] ?? ''), 'settings:close')
+                && str_contains((string) ($request['reply_markup'] ?? ''), 'nav:home');
         });
 
         $this->process($this->telegramCallbackPayload('settings:mode:full', 11));

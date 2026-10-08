@@ -35,7 +35,7 @@ Typed times are understood the way people say them: «8 المسا»، «6 ون�
 
 ## Settings
 
-Rows: region, morning time, evening time, reminder style, follow-up, pause or resume. There is no back button; the bottom keyboard is always there. `settings:close` is still handled for older messages. The summary above them lists region, both times, whether reminders are on, the reminder style, and the follow-up state.
+Rows: region, morning time, evening time, reminder style, follow-up, pause or resume, then `🔙 رجوع` (`nav:home`), the same back button as the help menu. `settings:close` is still handled for older messages. The summary above them lists region, both times, whether reminders are on, the reminder style, and the follow-up state.
 
 - Reminder style (`users.reminder_style`): `nudge` (default) or `direct`. The `🔔 شكل التذكير: …` button (`settings:style`) opens a screen that explains both styles side by side and marks the current one with ✅. `settings:style:nudge` and `settings:style:direct` save the choice. See Reminders.
 - Follow-up (`users.follow_up_enabled`, off by default). See Follow-up.

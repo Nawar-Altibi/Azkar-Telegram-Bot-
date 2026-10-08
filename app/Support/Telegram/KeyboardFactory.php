@@ -276,6 +276,7 @@ class KeyboardFactory
                 [$styleButton],
                 [$followUpButton],
                 [$reminderButton],
+                [['text' => __('bot.help_back'), 'callback_data' => 'nav:home']],
             ],
         ];
     }
