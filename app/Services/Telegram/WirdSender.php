@@ -54,13 +54,15 @@ class WirdSender
 
         $caption ??= __('bot.pdf_album_caption', ['title' => e($file['title'])]);
 
+        // An album holds at most 10 photos; even-sized albums avoid a lone last page (11 pages go as 6 + 5, not 10 + 1).
+        $chunks = array_chunk(range(0, $pageCount - 1), (int) ceil($pageCount / (int) ceil($pageCount / 10)));
         $sent = [];
-        foreach (array_chunk(range(0, $pageCount - 1), 10) as $chunk) {
+        foreach ($chunks as $index => $chunk) {
             $photos = array_map(
                 fn (int $i) => $fileIds !== null ? ['file_id' => $fileIds[$i]] : ['path' => $pages[$i]],
                 $chunk,
             );
-            $chunkCaption = $sent === [] ? $caption : '';
+            $chunkCaption = $index === array_key_last($chunks) ? $caption : '';
 
             try {
                 $result = $this->sendPhotos($chatId, $photos, $chunkCaption);

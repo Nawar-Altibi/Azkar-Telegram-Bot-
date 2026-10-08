@@ -117,6 +117,29 @@ class DirectReminderAndImagesTest extends TestCase
         Process::assertRanTimes(fn (PendingProcess $process) => true, 1);
     }
 
+    public function test_eleven_pages_are_split_into_even_albums_without_a_lone_page(): void
+    {
+        config(['adhkar.pdftoppm_binary' => 'pdftoppm']);
+        Process::fake(function (PendingProcess $process) {
+            $prefix = (string) end($process->command);
+            foreach (range(1, 11) as $page) {
+                File::put($prefix.'-'.$page.'.png', 'png'.$page);
+            }
+
+            return Process::result();
+        });
+        $this->user();
+
+        $this->press('sv:t:m:a', 12);
+
+        $albums = Http::recorded(fn ($request) => str_contains($request->url(), 'sendMediaGroup'))
+            ->map(fn ($pair) => count(json_decode((string) collect($pair[0]->data())->firstWhere('name', 'media')['contents'], true)))
+            ->values()
+            ->all();
+        $this->assertSame([6, 5], $albums);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendPhoto'));
+    }
+
     public function test_full_wird_falls_back_to_pdf_when_pages_cannot_be_made(): void
     {
         config(['adhkar.pdftoppm_binary' => 'pdftoppm']);
