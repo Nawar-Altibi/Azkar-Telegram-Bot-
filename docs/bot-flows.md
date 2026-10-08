@@ -101,6 +101,14 @@ The message has `📖 يلا نقرأ` (starts the reminder on the remembered wi
 
 `BotEventRecorder` writes rows to `bot_events` and never breaks a reply if that fails. Events include setup steps, time errors (with the reason), unknown text (trimmed to 80 characters), media, intents, help topics, pause and resume (with seconds since the pause), reminders opened, readings completed, reminder style, follow-up setting and sends, and shared locations (only whether a timezone was found).
 
+Newer events: `additional_item` (which additional dhikr was opened), `wird_saved` (collection and images or PDF), `feedback_sent`, `night_tip`, and `bot_blocked` / `bot_unblocked` from Telegram's `my_chat_member` update in the private chat.
+
+`ReadingSessionRecorder` keeps one `reading_sessions` row per opened wird: collection, phase, source (`reminder`, `direct`, `manual`, or `continue` for the full-only part after a short wird), the reminder log, the furthest card reached, the user's local hour and weekday, and when it was completed. Paging updates the row; a short/full switch on the first card within two minutes replaces it instead of counting a drop-off.
+
+`AdminReportService` builds the owner's report: users (new, setup funnel, active, reminders on, pauses, blocks, and how many of the previous period's new users came back), reminders (open and Done rates per period, the median minutes until opened, follow-ups), readings per collection with completion and the short/full split, where people open from, the busiest local hours, where readers stop (the most common last card per collection), and other usage (additional adhkar, saved wirds, help topics, reminder styles, feedback, groups).
+
+- `/stats` (or `/stats 30`) from `TELEGRAM_ADMIN_CHAT_ID` replies with the report; from anyone else it is an unknown command.
+- The weekly report goes to the same chat on Friday at 10:00 in `TELEGRAM_ADMIN_TIMEZONE` (default `Asia/Damascus`). It runs on the cron tick and is part of the wake schedule, and `bot:weekly-report` (hourly in the Laravel scheduler, `--force` to send now) does the same. The sent slot is kept in the cache so it goes out once.
 - `php artisan bot:stats --days=7` prints counts, the setup funnel, reminder completion, quick undos, and the top values per event.
 - Unknown text is deleted after 30 days, after each new unknown text and daily by `bot:prune-events`.
 

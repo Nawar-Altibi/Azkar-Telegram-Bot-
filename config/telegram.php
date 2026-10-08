@@ -11,4 +11,6 @@ return [
     // The owner's private chat: user feedback is copied here, replies to it go back to the user, and /stats answers only here.
     'admin_chat_id' => filled(env('TELEGRAM_ADMIN_CHAT_ID')) ? (int) env('TELEGRAM_ADMIN_CHAT_ID') : null,
     'feedback_per_hour' => (int) env('TELEGRAM_FEEDBACK_PER_HOUR', 5),
+    // The weekly report goes out on Friday at 10:00 in this timezone.
+    'admin_timezone' => env('TELEGRAM_ADMIN_TIMEZONE', 'Asia/Damascus'),
 ];

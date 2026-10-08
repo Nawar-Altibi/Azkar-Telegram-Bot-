@@ -14,6 +14,7 @@ class WakeScheduleService
         private readonly StaleRecoveryService $recovery,
         private readonly FollowUpReminderService $followUps,
         private readonly GroupPostService $groupPosts,
+        private readonly AdminReportService $reports,
     ) {}
 
     /**
@@ -37,6 +38,11 @@ class WakeScheduleService
         $groupPostAt = $this->groupPosts->nextDueAt();
         if ($groupPostAt !== null) {
             $times[] = $groupPostAt;
+        }
+
+        $reportAt = $this->reports->nextDueAt();
+        if ($reportAt !== null) {
+            $times[] = $reportAt;
         }
 
         // Follow-ups and recovery only run on recovery's own cadence, so they cannot wake it earlier than that.

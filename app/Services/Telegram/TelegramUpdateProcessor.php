@@ -13,9 +13,11 @@ use App\Models\AdhkarItem;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
+use App\Services\AdminReportService;
 use App\Services\BotEventRecorder;
 use App\Services\FeedbackService;
 use App\Services\OnboardingService;
+use App\Services\ReadingSessionRecorder;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
 use App\Support\DayPeriod;
@@ -46,6 +48,8 @@ class TelegramUpdateProcessor
         private readonly KeyboardFactory $keyboards,
         private readonly BotEventRecorder $events,
         private readonly FeedbackService $feedback,
+        private readonly ReadingSessionRecorder $readings,
+        private readonly AdminReportService $reports,
     ) {}
 
     /**
@@ -56,6 +60,12 @@ class TelegramUpdateProcessor
         // A user's chat_id is where their reminders go, so group updates never reach the per-user flow below.
         if ($this->groups->isGroupUpdate($payload)) {
             $this->groups->handle($payload);
+
+            return;
+        }
+
+        if (isset($payload['my_chat_member'])) {
+            $this->recordPrivateMembership($payload['my_chat_member']);
 
             return;
         }
@@ -97,6 +107,22 @@ class TelegramUpdateProcessor
         if ($update->message !== null) {
             $this->handleNonTextMessage($user, $update->message->kind);
         }
+    }
+
+    /**
+     * Telegram reports here when a user blocks or unblocks the bot in their private chat.
+     *
+     * @param  array<string, mixed>  $membership
+     */
+    private function recordPrivateMembership(array $membership): void
+    {
+        $status = data_get($membership, 'new_chat_member.status');
+        $user = User::query()->where('telegram_id', (int) data_get($membership, 'from.id'))->first();
+        if ($user === null || ! in_array($status, ['kicked', 'member'], true)) {
+            return;
+        }
+
+        $this->events->record($user, $status === 'kicked' ? 'bot_blocked' : 'bot_unblocked');
     }
 
     /**
@@ -259,6 +285,13 @@ class TelegramUpdateProcessor
     {
         $text = trim((string) $update->message?->text);
         $command = $this->extractCommand($text);
+
+        if ($command === '/stats' && $this->feedback->isAdminChat($user->chat_id)) {
+            $days = (int) (explode(' ', $text)[1] ?? 7);
+            $this->reply($user, $this->reports->build(min(90, max(1, $days))));
+
+            return;
+        }
 
         if ($command !== null) {
             $this->handleCommand($user, $command);
@@ -1078,6 +1111,7 @@ class TelegramUpdateProcessor
             }
 
             $this->safeAnswer($callbackId);
+            $this->events->record($user, 'additional_item', ['item' => $items[$position]->title ?: $items[$position]->key]);
             $this->show(
                 $user,
                 $this->content->formatItem($items[$position], $position + 1),
@@ -1200,6 +1234,7 @@ class TelegramUpdateProcessor
             'baseKey' => (string) $log->collection_key,
             'phase' => $phase,
             'index' => 0,
+            'opened' => true,
         ], $messageId);
     }
 
@@ -1357,7 +1392,7 @@ class TelegramUpdateProcessor
     }
 
     /**
-     * @param  array{scope:string,period?:string,log:?ReminderLog,baseKey:string,phase:string,index:int}  $session
+     * @param  array{scope:string,period?:string,log:?ReminderLog,baseKey:string,phase:string,index:int,opened?:bool}  $session  opened is true when the wird was just opened, not paged
      */
     private function presentReading(User $user, array $session, ?int $messageId): void
     {
@@ -1388,6 +1423,16 @@ class TelegramUpdateProcessor
         if ($isLast && $session['scope'] === 'today') {
             $this->events->record($user, 'reading_completed', ['scope' => 'manual', 'collection' => $headerKey]);
         }
+
+        $opened = $session['opened'] ?? false;
+        $log = $session['log'] instanceof ReminderLog ? $session['log'] : null;
+        $source = match (true) {
+            $session['phase'] === 'f' => 'continue',
+            $log === null => 'manual',
+            ! $opened && $user->sendsReadingWithReminder() => 'direct',
+            default => 'reminder',
+        };
+        $this->readings->record($user, $headerKey, $session['phase'], $source, $log?->id, $index, $total, $opened);
     }
 
     /**
@@ -1467,6 +1512,7 @@ class TelegramUpdateProcessor
             'baseKey' => (string) $this->content->manualBaseKey($period, 'a'),
             'phase' => 'a',
             'index' => 0,
+            'opened' => true,
         ], $messageId);
 
         if ($period === 'b') {
@@ -1514,6 +1560,7 @@ class TelegramUpdateProcessor
             'baseKey' => (string) $this->content->manualBaseKey($period, $phase),
             'phase' => $phase,
             'index' => 0,
+            'opened' => true,
         ], $messageId);
     }
 
@@ -1674,6 +1721,10 @@ class TelegramUpdateProcessor
             : $this->content->fullKey($session['baseKey']);
         $this->safeAnswer($callbackId);
         $fullOnly = $session['phase'] === 'f';
+        $this->events->record($user, 'wird_saved', [
+            'collection' => $headerKey,
+            'format' => str_starts_with($data, 'sv:') ? 'images' : 'pdf',
+        ]);
 
         try {
             if (str_starts_with($data, 'sv:')
