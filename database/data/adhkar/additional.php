@@ -221,7 +221,7 @@ return [
     [
         'key' => 'additional.12',
         'category' => 'additional',
-        'title' => 'دعوة ذي النون',
+        'title' => 'لا إله إلا أنت سبحانك إني كنت من الظالمين',
         'arabic_text' => 'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ.',
         'repetitions_count' => null,
         'repetitions_label' => 'دون عدد محدد.',
