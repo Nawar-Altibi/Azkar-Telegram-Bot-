@@ -92,19 +92,18 @@ class FeedbackService
         }
 
         $user = $feedback->user;
-        $name = e($user->first_name ?: __('bot.feedback_someone'));
         try {
             $this->telegram->sendMessage($user->chat_id, __('bot.feedback_reply_header'));
             $this->telegram->copyMessage($user->chat_id, $message->chatId, $message->messageId);
             $feedback->replied_at = now();
             $feedback->save();
-            $this->telegram->sendMessage($message->chatId, __('bot.feedback_reply_sent', ['name' => $name]));
+            $this->telegram->sendMessage($message->chatId, __('bot.feedback_reply_sent', ['id' => $feedback->id]));
         } catch (Throwable $exception) {
             Log::channel('telegram')->warning('Feedback reply not delivered', [
                 'feedback_id' => $feedback->id,
                 'error' => TelegramClient::redact($exception->getMessage()),
             ]);
-            $this->telegram->sendMessage($message->chatId, __('bot.feedback_reply_failed', ['name' => $name]));
+            $this->telegram->sendMessage($message->chatId, __('bot.feedback_reply_failed', ['id' => $feedback->id]));
         }
 
         return true;
@@ -140,9 +139,6 @@ class FeedbackService
 
         return __('bot.feedback_admin_header', [
             'id' => $feedback->id,
-            'name' => e($user->first_name ?: __('bot.feedback_someone')),
-            'username' => $user->username ? ' · @'.e($user->username) : '',
-            'telegram_id' => $user->telegram_id,
             'region' => e($region),
             'reminders' => __($user->reminders_enabled ? 'bot.reminders_on' : 'bot.reminders_off'),
             'since' => $user->created_at?->toDateString() ?? '—',

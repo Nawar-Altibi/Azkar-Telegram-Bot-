@@ -55,6 +55,9 @@ class FeedbackTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
             && (int) $request['chat_id'] === self::ADMIN
             && str_contains((string) $request['text'], 'ملاحظة جديدة'));
+        Http::assertNotSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === self::ADMIN
+            && (str_contains((string) ($request['text'] ?? ''), 'نوار')
+                || str_contains((string) ($request['text'] ?? ''), '1001')));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'copyMessage')
             && (int) $request['chat_id'] === self::ADMIN
             && (int) $request['from_chat_id'] === 1001
