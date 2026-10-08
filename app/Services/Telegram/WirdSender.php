@@ -101,13 +101,13 @@ class WirdSender
      */
     public function sendPdf(int $chatId, string $collectionKey, Collection $items, bool $fullOnly, ?string $caption = null): void
     {
-        $file = $this->pdf->describe($collectionKey, $items, $fullOnly);
+        $file = $this->pdf->describe($collectionKey, $items, $fullOnly, print: true);
         $cacheKey = 'adhkar:pdf_file_id:'.$file['hash'];
         $caption ??= __('bot.pdf_caption', ['title' => e($file['title'])]);
         $fileId = Cache::get($cacheKey);
         if (! is_string($fileId) || $fileId === '') {
             $fileId = null;
-            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
+            $file = $this->pdf->build($collectionKey, $items, $fullOnly, print: true);
         }
 
         try {
@@ -123,7 +123,7 @@ class WirdSender
                 throw $exception;
             }
             Cache::forget($cacheKey);
-            $file = $this->pdf->build($collectionKey, $items, $fullOnly);
+            $file = $this->pdf->build($collectionKey, $items, $fullOnly, print: true);
             $result = $this->telegram->sendDocument($chatId, $file['path'], $file['filename'], $caption);
         }
 

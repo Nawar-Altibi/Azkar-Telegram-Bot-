@@ -296,10 +296,6 @@ class AdhkarContentService
             $details[] = '📚 '.$this->escape($source);
         }
 
-        if (filled($item->hadith_grade)) {
-            $details[] = '✅ '.$this->escape((string) $item->hadith_grade);
-        }
-
         if ($details !== []) {
             $lines[] = '';
             $lines[] = filled($item->virtue)

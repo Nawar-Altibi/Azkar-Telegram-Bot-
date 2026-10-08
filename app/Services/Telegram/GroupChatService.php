@@ -163,7 +163,7 @@ class GroupChatService
         } catch (InvalidTimeException $exception) {
             $error = __('bot.'.$exception->reason, [
                 'input' => e($text),
-                'example' => $kind === 'mt' ? '5:45 الصبح' : '6:30 المسا',
+                'example' => $kind === 'mt' ? '5:45 صباحًا' : '6:30 مساءً',
             ]);
             $this->prompt($group->chat_id, $kind, null, $error, $reply);
 

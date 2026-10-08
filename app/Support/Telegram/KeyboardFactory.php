@@ -14,8 +14,8 @@ class KeyboardFactory
     {
         return [
             'inline_keyboard' => [
-                [['text' => '🚀 ابدأ الإعداد', 'callback_data' => 'onb:begin']],
-                [['text' => '💡 شو فكرة البوت؟', 'callback_data' => 'help:topic:idea']],
+                [['text' => __('bot.help_start_setup'), 'callback_data' => 'onb:begin']],
+                [['text' => __('bot.help_topics.idea.label'), 'callback_data' => 'help:topic:idea']],
             ],
         ];
     }
@@ -23,13 +23,16 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function helpMenu(): array
+    public function helpMenu(bool $onboarded): array
     {
         $rows = [];
         foreach (__('bot.help_topics') as $key => $topic) {
             $rows[] = [['text' => $topic['label'], 'callback_data' => 'help:topic:'.$key]];
         }
         $rows[] = [['text' => __('bot.feedback_button'), 'callback_data' => 'feedback:start', 'style' => 'success']];
+        $rows[] = $onboarded
+            ? [['text' => __('bot.help_back'), 'callback_data' => 'nav:home']]
+            : [['text' => __('bot.help_start_setup'), 'callback_data' => 'onb:begin', 'style' => 'primary']];
 
         return ['inline_keyboard' => $rows];
     }
@@ -49,12 +52,12 @@ class KeyboardFactory
     {
         $rows = [];
         if (! $onboarded) {
-            $rows[] = [['text' => '🚀 ابدأ الإعداد', 'callback_data' => 'onb:begin']];
+            $rows[] = [['text' => __('bot.help_start_setup'), 'callback_data' => 'onb:begin']];
         } else {
             $action = match ($key) {
                 'read' => ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
                 'night' => ['text' => '🛌 أذكار النوم', 'callback_data' => 'today:bedtime'],
-                'style' => ['text' => '🔔 اختار شكل التذكير', 'callback_data' => 'settings:style'],
+                'style' => ['text' => '🔔 اختر شكل التذكير', 'callback_data' => 'settings:style'],
                 'time', 'stop', 'missing' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
                 default => null,
             };
@@ -94,7 +97,7 @@ class KeyboardFactory
             $rows[] = $this->rtl($row);
         }
         // style colours the button on clients since Bot API 9.4; older clients ignore it.
-        $rows[] = [['text' => '✍️ دولة أخرى (أكتب اسمها)', 'callback_data' => 'onb:tz:custom', 'style' => 'primary']];
+        $rows[] = [['text' => '✍️ دولة أخرى (اكتب اسمها)', 'callback_data' => 'onb:tz:custom', 'style' => 'primary']];
         $rows[] = [['text' => '📍 حدد بلدي من موقعي', 'callback_data' => 'onb:loc', 'style' => 'success']];
         if ($includeBack) {
             $rows[] = $this->backOnlyRow();
@@ -113,7 +116,7 @@ class KeyboardFactory
         return [
             'keyboard' => [
                 [['text' => '📍 أرسل موقعي', 'request_location' => true]],
-                [['text' => '🌍 بختار من القائمة']],
+                [['text' => '🌍 سأختار من القائمة']],
             ],
             'resize_keyboard' => true,
             'one_time_keyboard' => true,
@@ -128,8 +131,8 @@ class KeyboardFactory
         return [
             'inline_keyboard' => [
                 $this->rtl([
-                    ['text' => '✅ صح', 'callback_data' => 'loc:yes'],
-                    ['text' => '🌍 بختار بنفسي', 'callback_data' => 'loc:no'],
+                    ['text' => '✅ نعم، صحيح', 'callback_data' => 'loc:yes'],
+                    ['text' => '🌍 سأختار بنفسي', 'callback_data' => 'loc:no'],
                 ]),
             ],
         ];
@@ -178,7 +181,7 @@ class KeyboardFactory
         if ($row !== []) {
             $rows[] = $this->rtl($row);
         }
-        $rows[] = [['text' => '⏰ وقت آخر (أكتبه بنفسي)', 'callback_data' => "onb:time:{$kind}:custom"]];
+        $rows[] = [['text' => '⏰ وقت آخر (اكتبه بنفسك)', 'callback_data' => "onb:time:{$kind}:custom"]];
         $rows[] = $this->backOnlyRow();
 
         return ['inline_keyboard' => $rows];
@@ -214,17 +217,18 @@ class KeyboardFactory
     public function readingNav(array $actions): array
     {
         $rows = [];
-        if (isset($actions['next'])) {
-            $rows[] = [['text' => '➡️ التالي', 'callback_data' => $actions['next']]];
-        }
-        if (isset($actions['prev'])) {
-            $rows[] = [['text' => 'السابق ⬅️', 'callback_data' => $actions['prev']]];
+        $steps = $this->rtl(array_values(array_filter([
+            isset($actions['prev']) ? ['text' => 'السابق ➡️', 'callback_data' => $actions['prev']] : null,
+            isset($actions['next']) ? ['text' => '⬅️ التالي', 'callback_data' => $actions['next']] : null,
+        ])));
+        if ($steps !== []) {
+            $rows[] = $steps;
         }
         if (isset($actions['switch_to_full'])) {
-            $rows[] = [['text' => '📖 بدّل للورد الكامل', 'callback_data' => $actions['switch_to_full']]];
+            $rows[] = [['text' => '📖 بدّل إلى الورد الكامل', 'callback_data' => $actions['switch_to_full']]];
         }
         if (isset($actions['switch_to_short'])) {
-            $rows[] = [['text' => '🌿 بدّل للورد المختصر', 'callback_data' => $actions['switch_to_short']]];
+            $rows[] = [['text' => '🌿 بدّل إلى الورد المختصر', 'callback_data' => $actions['switch_to_short']]];
         }
         if (isset($actions['save'])) {
             $rows[] = [['text' => '📥 أرسل الورد كاملًا', 'callback_data' => $actions['save']]];
@@ -260,8 +264,8 @@ class KeyboardFactory
             'callback_data' => 'settings:style',
         ];
         $followUpButton = $user->follow_up_enabled
-            ? ['text' => '🔁 تذكير تاني إذا نسيت: مشغّل ✅', 'callback_data' => 'settings:follow_up']
-            : ['text' => '🔁 تذكير تاني إذا نسيت: مطفي', 'callback_data' => 'settings:follow_up'];
+            ? ['text' => '🔁 تذكير ثانٍ إن نسيت: مفعّل ✅', 'callback_data' => 'settings:follow_up']
+            : ['text' => '🔁 تذكير ثانٍ إن نسيت: معطّل', 'callback_data' => 'settings:follow_up'];
 
         return [
             'inline_keyboard' => [
@@ -351,8 +355,8 @@ class KeyboardFactory
     {
         return [
             'inline_keyboard' => [
-                [['text' => '✅ تمام، هيك مناسب', 'callback_data' => 'onb:quick:yes']],
-                [['text' => '⏰ بدي أوقات تانية', 'callback_data' => 'onb:quick:custom']],
+                [['text' => '✅ نعم، هذا مناسب', 'callback_data' => 'onb:quick:yes']],
+                [['text' => '⏰ أريد أوقاتًا أخرى', 'callback_data' => 'onb:quick:custom']],
                 $this->backOnlyRow(),
             ],
         ];
@@ -422,8 +426,8 @@ class KeyboardFactory
 
         return [
             'inline_keyboard' => [
-                [['text' => '📖 يلا نقرأ', 'callback_data' => $start]],
-                [['text' => '🔕 لا تبعتلي تذكير تاني', 'callback_data' => 'settings:follow_up_off']],
+                [['text' => '📖 هيا نقرأ', 'callback_data' => $start]],
+                [['text' => '🔕 لا ترسل لي تذكيرًا ثانيًا', 'callback_data' => 'settings:follow_up_off']],
             ],
         ];
     }
@@ -516,7 +520,7 @@ class KeyboardFactory
         return [
             'inline_keyboard' => [
                 [['text' => '⏸ نعم، أوقف التذكيرات', 'callback_data' => 'settings:pause_yes']],
-                [['text' => '↩️ لا، خليها شغّالة', 'callback_data' => 'settings:open']],
+                [['text' => '↩️ لا، أبقِها مفعّلة', 'callback_data' => 'settings:open']],
             ],
         ];
     }
@@ -528,8 +532,8 @@ class KeyboardFactory
     {
         return [
             'inline_keyboard' => [
-                [['text' => '▶️ إي، رجّع التذكيرات', 'callback_data' => 'settings:resume']],
-                [['text' => '↩️ لا، خليها موقوفة', 'callback_data' => 'settings:open']],
+                [['text' => '▶️ نعم، أعد تشغيل التذكيرات', 'callback_data' => 'settings:resume']],
+                [['text' => '↩️ لا، أبقِها موقوفة', 'callback_data' => 'settings:open']],
             ],
         ];
     }
@@ -541,7 +545,7 @@ class KeyboardFactory
     {
         return [
             'inline_keyboard' => [
-                [['text' => '↩️ تراجع، رجّع التذكيرات', 'callback_data' => 'settings:resume']],
+                [['text' => '↩️ تراجع، أعد تشغيل التذكيرات', 'callback_data' => 'settings:resume']],
                 [['text' => '⚙️ الإعدادات', 'callback_data' => 'settings:open']],
             ],
         ];
@@ -555,7 +559,7 @@ class KeyboardFactory
         return [
             'inline_keyboard' => [
                 [['text' => '🔄 نعم، أعد الإعداد من البداية', 'callback_data' => 'onb:reset:yes']],
-                [['text' => '↩️ لا، خلّي إعداداتي', 'callback_data' => 'onb:reset:no']],
+                [['text' => '↩️ لا، أبقِ إعداداتي', 'callback_data' => 'onb:reset:no']],
             ],
         ];
     }

@@ -653,7 +653,7 @@ class TelegramUpdateProcessor
             $this->feedback->close($user);
             if ($data === 'feedback:cancel') {
                 $this->safeAnswer($callbackId);
-                $this->show($user, __('bot.feedback_cancelled'), $this->keyboards->helpMenu(), $messageId);
+                $this->show($user, __('bot.feedback_cancelled'), $this->keyboards->helpMenu($user->isOnboarded()), $messageId);
 
                 return;
             }
@@ -675,6 +675,13 @@ class TelegramUpdateProcessor
         if ($data === 'nav:back') {
             $this->safeAnswer($callbackId);
             $this->sendResponse($user, $this->onboarding->back($user->fresh()), $messageId);
+
+            return;
+        }
+
+        if ($data === 'nav:home') {
+            $this->safeAnswer($callbackId);
+            $this->sendResponse($user, $this->onboarding->start($user->fresh()), $messageId);
 
             return;
         }
@@ -1636,7 +1643,7 @@ class TelegramUpdateProcessor
 
     private function showHelpMenu(User $user, ?int $messageId): void
     {
-        $this->show($user, __('bot.help'), $this->keyboards->helpMenu(), $messageId);
+        $this->show($user, __('bot.help'), $this->keyboards->helpMenu($user->isOnboarded()), $messageId);
     }
 
     private function showHelpTopic(User $user, string $key, ?int $messageId): void

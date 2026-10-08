@@ -66,7 +66,7 @@ class SettingsPauseResumeTest extends TestCase
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'editMessageText')
-                && str_contains((string) ($request['text'] ?? ''), 'شو حابب تقرأ')
+                && str_contains((string) ($request['text'] ?? ''), 'ماذا تحب أن تقرأ')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'today:morning');
         });
         Http::assertNotSent(fn ($request) => ($request['text'] ?? '') === 'تم');
@@ -86,7 +86,7 @@ class SettingsPauseResumeTest extends TestCase
             fn ($pair) => str_contains($pair[0]->url(), 'sendMessage')
         )->count());
         Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
-            && str_contains((string) ($request['text'] ?? ''), 'رح نذكّرك بأذكار الصباح'));
+            && str_contains((string) ($request['text'] ?? ''), 'سنذكّرك بأذكار الصباح'));
     }
 
     public function test_pausing_from_settings_asks_first_and_offers_undo(): void
@@ -95,12 +95,12 @@ class SettingsPauseResumeTest extends TestCase
 
         $this->process($this->telegramCallbackPayload('settings:pause_ask', 40));
         $this->assertTrue($user->fresh()->reminders_enabled);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بدك توقف التذكيرات')
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هل تريد إيقاف التذكيرات')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:pause_yes'));
 
         $this->process($this->telegramCallbackPayload('settings:pause_yes', 41));
         $this->assertFalse($user->fresh()->reminders_enabled);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'وقّفنا التذكيرات')
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أوقفنا التذكيرات')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:resume'));
 
         $this->process($this->telegramCallbackPayload('settings:resume', 42));

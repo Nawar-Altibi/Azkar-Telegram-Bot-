@@ -10,6 +10,7 @@ use App\Models\AdhkarItem;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\ContentSyncService;
+use App\Services\Telegram\TelegramUpdateProcessor;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -50,13 +51,13 @@ class ReminderDeliveryAndVersioningTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($text, 'حان وقت أذكار الصباح')
-                && str_contains($text, 'تقريبًا 5 دقائق')
+                && str_contains($text, 'نحو 5 دقائق')
                 && str_contains($markup, 'تعديل الوقت')
                 && str_contains($markup, 'reminder:start:'.$log->id.':s')
                 && str_contains($markup, 'reminder:start:'.$log->id.':a');
         });
 
-        app(\App\Services\Telegram\TelegramUpdateProcessor::class)->handle(
+        app(TelegramUpdateProcessor::class)->handle(
             $this->telegramCallbackPayload('reminder:start:'.$log->id, 80, 2002)
         );
         $log->refresh();

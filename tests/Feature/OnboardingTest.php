@@ -37,7 +37,7 @@ class OnboardingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($request->url(), 'sendMessage')
-                && str_contains($text, 'أهلاً بك في بوت الأذكار')
+                && str_contains($text, 'أهلًا بك في بوت الأذكار')
                 && str_contains($text, 'أذكار الصباح والمساء')
                 && substr_count($text, "\n") <= 3
                 && str_contains($markup, 'onb:begin')
@@ -77,7 +77,7 @@ class OnboardingTest extends TestCase
         $this->assertNotNull($user->next_evening_at);
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sendMessage')
-                && str_contains((string) ($request['text'] ?? ''), 'كل شي جاهز')
+                && str_contains((string) ($request['text'] ?? ''), 'كل شيء جاهز')
                 && ! str_contains((string) ($request['text'] ?? ''), 'الورد:')
                 && str_contains((string) ($request['reply_markup'] ?? ''), '"keyboard"');
         });
@@ -112,7 +112,7 @@ class OnboardingTest extends TestCase
             $text = (string) ($request['text'] ?? '');
             $markup = (string) ($request['reply_markup'] ?? '');
 
-            return str_contains($text, 'بين الساعة والدقائق حط نقطتين')
+            return str_contains($text, 'ضع نقطتين ( : ) بين الساعة والدقائق')
                 && str_contains($text, "كتبت:\n\u{200E}7;42\n")
                 && str_contains($markup, 'onb:time:morning:0742')
                 && str_contains($markup, 'nav:cancel');
@@ -120,16 +120,16 @@ class OnboardingTest extends TestCase
         $this->assertSame('06:00:00', $user->fresh()->morning_time);
 
         $this->process($this->telegramMessagePayload('7:090', 2));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الدقائق بتنكتب برقمين'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'تُكتب الدقائق برقمين'));
 
         $this->process($this->telegramMessagePayload('25:00', 3));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الساعة لازم تكون رقم من 1 إلى 12'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'يجب أن تكون الساعة رقمًا من 1 إلى 12'));
 
         $this->process($this->telegramMessagePayload('<b>صباحًا</b>', 4));
         Http::assertSent(function ($request) {
             $text = (string) ($request['text'] ?? '');
 
-            return str_contains($text, 'ما فيه ساعة') && str_contains($text, '&lt;b&gt;');
+            return str_contains($text, 'لا يتضمن ساعة') && str_contains($text, '&lt;b&gt;');
         });
 
         $this->process($this->telegramCallbackPayload('onb:time:morning:0742', 5));
@@ -146,10 +146,10 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramMessagePayload('123', 5));
 
         Http::assertSent(function ($request) {
-            return str_contains((string) ($request['text'] ?? ''), 'ما لقيت «زحل»')
+            return str_contains((string) ($request['text'] ?? ''), 'لم أجد «زحل»')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'nav:back');
         });
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اسم البلد بينكتب بالحروف'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'يُكتب اسم البلد بالحروف'));
     }
 
     public function test_unrelated_text_during_onboarding_shows_the_current_step(): void
@@ -166,8 +166,8 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramMessagePayload('مرحبا', 1));
 
         Http::assertSent(function ($request) {
-            return str_contains((string) ($request['text'] ?? ''), 'لسا عم نكمّل الإعداد')
-                && str_contains((string) ($request['text'] ?? ''), 'اخترنالك وقتين')
+            return str_contains((string) ($request['text'] ?? ''), 'ما زلنا نُكمل الإعداد')
+                && str_contains((string) ($request['text'] ?? ''), 'اخترنا لك وقتين')
                 && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:quick:yes');
         });
     }
@@ -235,7 +235,7 @@ class OnboardingTest extends TestCase
             $markup = (string) ($request['reply_markup'] ?? '');
 
             return str_contains($markup, 'nav:back')
-                && str_contains((string) ($request['text'] ?? ''), '6 ونص الصبح')
+                && str_contains((string) ($request['text'] ?? ''), '6 ونصف صباحًا')
                 && ! str_contains($markup, 'nav:cancel');
         });
     }
@@ -279,7 +279,7 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramMessagePayload('/start', 1));
 
         $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بعودتك'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلًا بعودتك'));
         Http::assertSent(function ($request) {
             $markup = json_decode((string) ($request['reply_markup'] ?? ''), true);
 
@@ -290,7 +290,7 @@ class OnboardingTest extends TestCase
         });
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'سوريا'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
-        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلًا بك في بوت الأذكار'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin'));
     }
 
@@ -325,6 +325,24 @@ class OnboardingTest extends TestCase
         $this->assertSame(OnboardingState::Completed, $user->fresh()->onboarding_state);
     }
 
+    public function test_help_menu_ends_with_back_once_set_up_and_with_start_setup_before(): void
+    {
+        $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+
+        $this->process($this->telegramCallbackPayload('help:menu', 1));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'nav:home')
+            && ! str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin'));
+
+        $this->process($this->telegramCallbackPayload('nav:home', 2));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلًا بعودتك'));
+
+        $user->update(['onboarding_state' => OnboardingState::New]);
+        $this->process($this->telegramCallbackPayload('help:menu', 3));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اختر سؤالك')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'onb:begin')
+            && ! str_contains((string) ($request['reply_markup'] ?? ''), 'nav:home'));
+    }
+
     public function test_help_lists_questions_and_answers_each_one(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
@@ -355,7 +373,7 @@ class OnboardingTest extends TestCase
             && str_contains((string) ($request['reply_markup'] ?? ''), 'help:menu'));
 
         $this->process($this->telegramCallbackPayload('help:topic:modes', 3));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'تقريبًا 5 دقائق'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'نحو 5 دقائق'));
 
         $this->process($this->telegramMessagePayload('❓ مساعدة', 4));
         $this->process($this->telegramMessagePayload('/help', 5));
@@ -406,8 +424,8 @@ class OnboardingTest extends TestCase
         $this->assertSame('06:00:00', $fresh->morning_time);
         $this->assertNull($fresh->evening_time);
         $this->assertSame('سوريا', $fresh->timezone_label);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'بتحب نذكّرك بأذكار المساء'));
-        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلاً بك في بوت الأذكار'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'تحب أن نذكّرك بأذكار المساء'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أهلًا بك في بوت الأذكار'));
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'Asia/Damascus'));
     }
 

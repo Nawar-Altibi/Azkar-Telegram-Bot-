@@ -32,9 +32,9 @@ class AdhkarPdfService
      *
      * @param  Collection<int, AdhkarItem>  $items
      */
-    public function contentHash(string $collectionKey, Collection $items, bool $fullOnly = false): string
+    public function contentHash(string $collectionKey, Collection $items, bool $fullOnly = false, bool $print = false): string
     {
-        $parts = [$collectionKey, $fullOnly ? 'f' : '', $this->viewsHash(), md5_file(__FILE__)];
+        $parts = [$collectionKey, $fullOnly ? 'f' : '', $print ? 'p' : '', $this->viewsHash(), md5_file(__FILE__)];
         foreach ($items as $item) {
             $parts[] = $item->key.'@'.$item->content_version;
         }
@@ -44,15 +44,16 @@ class AdhkarPdfService
 
     /**
      * @param  Collection<int, AdhkarItem>  $items
+     * @param  bool  $print  ink-light palette that stays readable on black-and-white printers; page images use the screen palette
      * @return array{path:string,filename:string,title:string,hash:string}
      */
-    public function build(string $collectionKey, Collection $items, bool $fullOnly = false): array
+    public function build(string $collectionKey, Collection $items, bool $fullOnly = false, bool $print = false): array
     {
-        $file = $this->describe($collectionKey, $items, $fullOnly);
+        $file = $this->describe($collectionKey, $items, $fullOnly, $print);
 
         if (! is_file($file['path'])) {
             File::ensureDirectoryExists(dirname($file['path']));
-            $this->render($collectionKey, $items, $fullOnly, $file['title'], $file['path']);
+            $this->render($collectionKey, $items, $fullOnly, $print, $file['title'], $file['path']);
         }
 
         return $file;
@@ -64,13 +65,13 @@ class AdhkarPdfService
      * @param  Collection<int, AdhkarItem>  $items
      * @return array{path:string,filename:string,title:string,hash:string}
      */
-    public function describe(string $collectionKey, Collection $items, bool $fullOnly = false): array
+    public function describe(string $collectionKey, Collection $items, bool $fullOnly = false, bool $print = false): array
     {
-        $hash = $this->contentHash($collectionKey, $items, $fullOnly);
+        $hash = $this->contentHash($collectionKey, $items, $fullOnly, $print);
         $title = $this->content->wirdTitle($collectionKey, $fullOnly);
 
         return [
-            'path' => storage_path('app/pdf').'/'.$collectionKey.($fullOnly ? '-extra' : '').'-'.$hash.'.pdf',
+            'path' => storage_path('app/pdf').'/'.$collectionKey.($fullOnly ? '-extra' : '').($print ? '-print' : '').'-'.$hash.'.pdf',
             'filename' => str_replace([' — ', ' '], '-', $title).'.pdf',
             'title' => $title,
             'hash' => $hash,
@@ -136,13 +137,13 @@ class AdhkarPdfService
     /**
      * @param  Collection<int, AdhkarItem>  $items
      */
-    private function render(string $collectionKey, Collection $items, bool $fullOnly, string $title, string $path): void
+    private function render(string $collectionKey, Collection $items, bool $fullOnly, bool $print, string $title, string $path): void
     {
         $heading = $this->content->collectionHeading($collectionKey);
         $subtitle = $this->subtitle($collectionKey, $fullOnly, $items->count());
         $t = fn (?string $text): string => $this->typeset($text);
 
-        $css = view('pdf.wird.styles')->render();
+        $css = view('pdf.wird.styles', ['print' => $print])->render();
         $cover = view('pdf.wird.cover', ['heading' => $heading, 'subtitle' => $subtitle])->render();
         $items = $items->values();
         $card = fn (int $index, int $compact = 0): string => view('pdf.wird.card', [

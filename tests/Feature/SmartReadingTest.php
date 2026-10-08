@@ -66,7 +66,7 @@ class SmartReadingTest extends TestCase
         $user = $this->user();
 
         $this->handle($this->telegramCallbackPayload('today:morning', 10));
-        $this->assertStringContainsString('أي ورد بتحب تقرأ', $this->lastText());
+        $this->assertStringContainsString('أي ورد تحب أن تقرأ', $this->lastText());
 
         $this->handle($this->telegramCallbackPayload('md:m:a', 11));
         $user->refresh();
@@ -81,7 +81,7 @@ class SmartReadingTest extends TestCase
         $this->handle($this->telegramCallbackPayload('md:e:s', 13));
         $this->assertSame(AdhkarMode::Short, $user->fresh()->mode);
         $this->assertStringStartsWith("🌙 أذكار المساء\n🌿 مختصر", $this->lastText());
-        $this->assertStringContainsString('بدّل للورد الكامل', json_encode($this->lastMarkup(), JSON_UNESCAPED_UNICODE));
+        $this->assertStringContainsString('بدّل إلى الورد الكامل', json_encode($this->lastMarkup(), JSON_UNESCAPED_UNICODE));
     }
 
     public function test_switching_inside_a_reminder_keeps_the_done_button_on_the_new_wird(): void

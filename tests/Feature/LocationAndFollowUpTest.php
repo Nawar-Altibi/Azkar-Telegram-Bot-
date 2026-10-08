@@ -8,10 +8,13 @@ use App\Enums\ReminderLogStatus;
 use App\Enums\ReminderType;
 use App\Models\ReminderLog;
 use App\Models\User;
+use App\Services\CronTickService;
 use App\Services\FollowUpReminderService;
+use App\Services\StaleRecoveryService;
 use App\Services\Telegram\TelegramUpdateProcessor;
 use App\Support\NearestTimezone;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -43,10 +46,10 @@ class LocationAndFollowUpTest extends TestCase
         $user = User::query()->where('telegram_id', 1001)->first();
         $this->assertSame('onboarding:location', $user->awaiting_input);
         Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'request_location')
-            && str_contains((string) ($request['text'] ?? ''), 'ما منحفظ موقعك'));
+            && str_contains((string) ($request['text'] ?? ''), 'لا نحفظ موقعك'));
 
         $this->location(33.51, 36.29, 4);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الساعة عندك هلق 4:26 عصرًا')
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الساعة عندك الآن 4:26 عصرًا')
             && str_contains((string) ($request['text'] ?? ''), 'سوريا')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'loc:yes'));
         $this->assertNull($user->fresh()->timezone);
@@ -63,7 +66,7 @@ class LocationAndFollowUpTest extends TestCase
         $user = User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001, 'onboarding_state' => OnboardingState::WaitingTimezone]);
         $this->press('onb:loc', 1);
 
-        $this->message('🌍 بختار من القائمة', 2);
+        $this->message('🌍 سأختار من القائمة', 2);
 
         $this->assertNull($user->fresh()->awaiting_input);
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'اختر منطقتك')
@@ -75,7 +78,7 @@ class LocationAndFollowUpTest extends TestCase
         $user = $this->onboardedUser(['timezone' => 'Asia/Riyadh']);
 
         $this->location(33.51, 36.29, 1);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما كنت طالبه'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لم أطلبه'));
         $this->assertSame('Asia/Riyadh', $user->fresh()->timezone);
 
         $this->press('onb:loc', 2);
@@ -87,7 +90,7 @@ class LocationAndFollowUpTest extends TestCase
         $this->location(30.04, 31.24, 6);
         $this->press('loc:yes', 7);
         $this->assertSame('Africa/Cairo', $user->fresh()->timezone);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'رجّعنالك الأزرار'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'أعدنا لك الأزرار'));
     }
 
     public function test_one_follow_up_is_sent_an_hour_later_while_the_period_is_still_current(): void
@@ -98,7 +101,7 @@ class LocationAndFollowUpTest extends TestCase
 
         $this->assertSame(1, app(FollowUpReminderService::class)->sendDue());
         $this->assertNotNull($log->fresh()->follow_up_sent_at);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لسا في وقت لأذكار الصباح')
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما زال في وقت أذكار الصباح متّسع')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'reminder:start:'.$log->id.':a')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:follow_up_off'));
 
@@ -113,9 +116,9 @@ class LocationAndFollowUpTest extends TestCase
         $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
         $user = $this->onboardedUser(['follow_up_enabled' => true]);
         $this->sentLog($user, now()->subMinutes(70));
-        \Illuminate\Support\Facades\Cache::forget(\App\Services\StaleRecoveryService::MARKER_KEY);
+        Cache::forget(StaleRecoveryService::MARKER_KEY);
 
-        $metrics = app(\App\Services\CronTickService::class)->run();
+        $metrics = app(CronTickService::class)->run();
 
         $this->assertTrue($metrics['stale_recovery_ran']);
         $this->assertSame(1, $metrics['follow_ups_sent']);
@@ -149,7 +152,7 @@ class LocationAndFollowUpTest extends TestCase
 
         $this->press('settings:follow_up', 1);
         $this->assertTrue($user->fresh()->follow_up_enabled);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'تذكير تاني إذا نسيت: مشغّل'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'تذكير ثانٍ إن نسيت: مفعّل'));
 
         $this->press('settings:follow_up', 2);
         $this->assertFalse($user->fresh()->follow_up_enabled);

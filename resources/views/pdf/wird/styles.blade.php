@@ -32,3 +32,31 @@ body { font-family: amiri; direction: rtl; color: #1f2a3d; font-size: 12pt; }
 .closing .ornament { color: #d79b45; font-size: 14pt; }
 .closing-title { font-family: tajawal; font-weight: bold; font-size: 13pt; color: #1d3566; margin-top: 1mm; }
 .closing-blessing { font-size: 13pt; color: #8a6430; margin-top: 1mm; }
+@if ($print ?? false)
+
+/*
+ * Printable copy: white paper, no large ink fills, and every text colour dark enough to stay crisp
+ * when a black-and-white printer turns it into grey. Accents are borders, so colour printers still show the palette.
+ */
+@page { background-color: #ffffff; }
+body { color: #111827; }
+.page-header, .page-footer { color: #5b4a2a; }
+.cover { background-color: #ffffff; background: #ffffff; border: 0.6mm solid #1d3566; }
+.cover .ornament { color: #8a6420; }
+.cover h1 { color: #1d3566; }
+.cover .subtitle { color: #5b4a2a; }
+.item { border: 0.3mm solid #9c9178; }
+.num { color: #ffffff; background-color: #1d3566; }
+.title { color: #1d3566; }
+.reps { color: #111827; background-color: #fbe7c2; }
+.reps-once { color: #4b4a44; }
+.reps-note { color: #5b3d10; background-color: #ffffff; border: 0.25mm solid #b08a4a; }
+.text { color: #000000; }
+.virtue { background-color: #ffffff; border-right: 0.8mm solid #1f5e68; color: #1f2937; }
+.virtue b { color: #1d3566; }
+.source { color: #4b4a44; }
+.closing { border-top: 0.3mm solid #9c9178; }
+.closing .ornament { color: #8a6420; }
+.closing-title { color: #1d3566; }
+.closing-blessing { color: #5b3d10; }
+@endif

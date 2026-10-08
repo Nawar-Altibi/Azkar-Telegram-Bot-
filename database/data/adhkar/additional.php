@@ -188,7 +188,7 @@ return [
         'timing' => null,
         'virtue' => null,
         'source_text' => null,
-        'source_name' => 'صحيح البخاري (وردت بألفاظ متقاربة في الصحيحين). درجتها: صحيح.',
+        'source_name' => 'صحيح البخاري (وردت بألفاظ متقاربة في الصحيحين).',
         'hadith_number' => null,
         'hadith_grade' => 'صحيح',
         'narrator' => null,

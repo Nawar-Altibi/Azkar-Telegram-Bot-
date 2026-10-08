@@ -33,7 +33,7 @@
             <div class="virtue"><b>الفضل:</b> {{ $t($item->virtue) }}</div>
         @endif
         @if (filled($item->source_name))
-            <div class="source">{!! $amiri($t($item->source_name)) !!}@if (filled($item->hadith_grade)) · {!! $amiri($t($item->hadith_grade)) !!}@endif</div>
+            <div class="source">{!! $amiri($t($item->source_name)) !!}</div>
         @endif
     </div>
 </div>

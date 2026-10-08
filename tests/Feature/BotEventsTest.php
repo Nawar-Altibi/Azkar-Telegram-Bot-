@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\BotEventRecorder;
 use App\Services\Telegram\TelegramUpdateProcessor;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class BotEventsTest extends TestCase
@@ -45,7 +46,7 @@ class BotEventsTest extends TestCase
         $this->assertLessThanOrEqual(5, BotEvent::query()->where('event', 'resumed')->first()->meta['seconds_after_pause']);
 
         $this->artisan('bot:stats')
-            ->expectsOutputToContain('الإعداد: بدأ 1 · خلّص 1')
+            ->expectsOutputToContain('الإعداد: بدأ 1 · أكمله 1')
             ->expectsOutputToContain('رجوع سريع خلال دقيقتين: 1')
             ->assertSuccessful();
     }
@@ -71,11 +72,11 @@ class BotEventsTest extends TestCase
     public function test_a_broken_events_table_never_blocks_the_reply(): void
     {
         User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
-        \Illuminate\Support\Facades\Schema::drop('bot_events');
+        Schema::drop('bot_events');
 
         $this->handle($this->telegramMessagePayload('بطاطا', 1));
 
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما فهمت'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لم أفهم'));
     }
 
     /**

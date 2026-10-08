@@ -81,12 +81,12 @@ class AdhkarContentServiceTest extends TestCase
         $service = app(AdhkarContentService::class);
         $nudge = $service->nudgeText('morning_short');
         $this->assertStringContainsString('حان وقت أذكار الصباح', $nudge);
-        $this->assertStringContainsString('مختصر: تقريبًا 5 دقائق', $nudge);
-        $this->assertStringContainsString('كامل: تقريبًا 10–15 دقيقة', $nudge);
+        $this->assertStringContainsString('مختصر: نحو 5 دقائق', $nudge);
+        $this->assertStringContainsString('كامل: نحو 10–15 دقيقة', $nudge);
 
         $evening = $service->nudgeText('evening_full');
         $this->assertStringContainsString('حان وقت أذكار المساء', $evening);
-        $this->assertStringContainsString('مختصر: تقريبًا 5 دقائق', $evening);
+        $this->assertStringContainsString('مختصر: نحو 5 دقائق', $evening);
 
         $item = new AdhkarItem([
             'title' => 'آية الكرسي',

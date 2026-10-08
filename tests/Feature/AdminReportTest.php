@@ -73,7 +73,7 @@ class AdminReportTest extends TestCase
         $this->handle($this->telegramMessagePayload('/stats 30', 2, self::ADMIN));
         Http::assertSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === self::ADMIN
             && str_contains((string) $request['text'], 'تقرير آخر 30 أيام')
-            && str_contains((string) $request['text'], 'المستخدمين'));
+            && str_contains((string) $request['text'], 'المستخدمون'));
     }
 
     public function test_report_shows_where_readers_stop_and_what_they_open(): void
@@ -96,9 +96,9 @@ class AdminReportTest extends TestCase
 
         $report = app(AdminReportService::class)->build(7);
 
-        $this->assertStringContainsString('أذكار المساء (كامل): 4 ما كمّلوا · أكتر وقفة عند الذكر 3 من 19 (3 منهم)', $report);
+        $this->assertStringContainsString('أذكار المساء (كامل): 4 لم يُكملوا · أكثر توقف عند الذكر 3 من 19 (3 منهم)', $report);
         $this->assertStringContainsString('9:00 مساءً (4)', $report);
-        $this->assertStringContainsString('الوضع الليلي لراحة عيونك (1)', $report);
+        $this->assertStringContainsString('الوضع الليلي لراحة عينيك (1)', $report);
     }
 
     public function test_weekly_report_goes_out_once_on_friday_morning(): void

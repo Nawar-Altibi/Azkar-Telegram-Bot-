@@ -132,14 +132,14 @@ class AdminReportService
         $returned = (clone $cohort)->where('last_interaction_at', '>=', $since)->count();
 
         $lines = [
-            '👥 <b>المستخدمين</b>',
-            "• الكل: {$total} · جداد: {$new} · خلّصوا الإعداد (من الأول): {$onboarded}",
-            "• الإعداد بهالفترة: بلّش {$started} · خلّص {$finished} ".$this->pct($finished, $started),
-            "• نشطين: آخر 24 ساعة {$activeDay} · بالفترة {$activeWindow}",
-            "• التذكيرات شغّالة عند {$remindersOn} · وقّفوها {$this->eventCount('paused', $since)} مرة · حظروا البوت {$blocked}",
+            '👥 <b>المستخدمون</b>',
+            "• الإجمالي: {$total} · الجدد: {$new} · أكملوا الإعداد (منذ البداية): {$onboarded}",
+            "• الإعداد في هذه الفترة: بدأه {$started} · أكمله {$finished} ".$this->pct($finished, $started),
+            "• النشطون: آخر 24 ساعة {$activeDay} · خلال الفترة {$activeWindow}",
+            "• التذكيرات مفعّلة لدى {$remindersOn} · أُوقفت {$this->eventCount('paused', $since)} مرة · حظروا البوت {$blocked}",
         ];
         if ($cohortSize > 0) {
-            $lines[] = "• يلي إجوا بالـ{$days} أيام يلي قبلها ({$cohortSize}): رجعوا هالفترة ".$this->pct($returned, $cohortSize);
+            $lines[] = "• من انضموا في الأيام الـ{$days} السابقة ({$cohortSize}): عادوا في هذه الفترة ".$this->pct($returned, $cohortSize);
         }
 
         return implode("\n", $lines);
@@ -152,7 +152,7 @@ class AdminReportService
             ->whereIn('status', [ReminderLogStatus::Sent, ReminderLogStatus::Completed])
             ->get(['id', 'reminder_type', 'sent_at', 'status', 'follow_up_sent_at']);
         if ($logs->isEmpty()) {
-            return "🔔 <b>التذكيرات</b>\n• ما انبعت ولا تذكير بهالفترة.";
+            return "🔔 <b>التذكيرات</b>\n• لم يُرسَل أي تذكير في هذه الفترة.";
         }
 
         $openedAt = ReadingSession::query()
@@ -172,24 +172,24 @@ class AdminReportService
 
         $lines = [
             '🔔 <b>التذكيرات</b>',
-            "• انبعت {$logs->count()} · انفتح {$opened->count()} ".$this->pct($opened->count(), $logs->count())
+            "• أُرسل {$logs->count()} · فُتح {$opened->count()} ".$this->pct($opened->count(), $logs->count())
                 ." · ضغطوا «تم» {$done} ".$this->pct($done, $logs->count()),
         ];
-        foreach ([ReminderType::Morning->value => '🌅 الصباح', ReminderType::Evening->value => '🌙 المسا'] as $type => $label) {
+        foreach ([ReminderType::Morning->value => '🌅 الصباح', ReminderType::Evening->value => '🌙 المساء'] as $type => $label) {
             $ofType = $logs->filter(fn (ReminderLog $log) => $log->reminder_type?->value === $type);
             if ($ofType->isNotEmpty()) {
                 $openedOfType = $ofType->filter(fn (ReminderLog $log) => $openedAt->has($log->id))->count();
-                $lines[] = "• {$label}: انفتح {$openedOfType} من {$ofType->count()} ".$this->pct($openedOfType, $ofType->count());
+                $lines[] = "• {$label}: فُتح {$openedOfType} من {$ofType->count()} ".$this->pct($openedOfType, $ofType->count());
             }
         }
         if ($minutes->isNotEmpty()) {
-            $lines[] = '• بالعادة بينفتح بعد '.$minutes[intdiv($minutes->count(), 2)].' دقيقة من وصوله';
+            $lines[] = '• يُفتح عادةً بعد '.$minutes[intdiv($minutes->count(), 2)].' دقيقة من وصوله';
         }
 
         $followUps = $logs->whereNotNull('follow_up_sent_at');
         if ($followUps->isNotEmpty()) {
             $afterFollowUp = $followUps->filter(fn (ReminderLog $log) => $openedAt->has($log->id) && $openedAt[$log->id]->gte($log->follow_up_sent_at))->count();
-            $lines[] = "• التذكير التاني: انبعت {$followUps->count()} · انفتح بعده {$afterFollowUp} ".$this->pct($afterFollowUp, $followUps->count());
+            $lines[] = "• التذكير الثاني: أُرسل {$followUps->count()} · فُتح بعده {$afterFollowUp} ".$this->pct($afterFollowUp, $followUps->count());
         }
 
         return implode("\n", $lines);
@@ -201,18 +201,18 @@ class AdminReportService
     private function readingSection(Collection $sessions): string
     {
         if ($sessions->isEmpty()) {
-            return "📖 <b>القراءة</b>\n• ما في قراءات بهالفترة.";
+            return "📖 <b>القراءة</b>\n• لا قراءات في هذه الفترة.";
         }
 
         $fresh = $sessions->where('source', '!=', 'continue');
         $completed = $fresh->whereNotNull('completed_at')->count();
         $lines = [
             '📖 <b>القراءة</b>',
-            "• فتحوا ورد {$fresh->count()} مرة · وصلوا للآخر {$completed} ".$this->pct($completed, $fresh->count()),
+            "• فُتح ورد {$fresh->count()} مرة · وصلوا إلى آخره {$completed} ".$this->pct($completed, $fresh->count()),
         ];
 
         foreach ($fresh->groupBy(fn (ReadingSession $s) => ReadingSessionRecorder::group($s->collection_key))->sortByDesc(fn (Collection $g) => $g->count()) as $group => $ofGroup) {
-            $line = '• '.$this->content->collectionHeading((string) $group).": {$ofGroup->count()} · خلّصوا ".$this->pct($ofGroup->whereNotNull('completed_at')->count(), $ofGroup->count());
+            $line = '• '.$this->content->collectionHeading((string) $group).": {$ofGroup->count()} · أكملوه ".$this->pct($ofGroup->whereNotNull('completed_at')->count(), $ofGroup->count());
             $full = $ofGroup->filter(fn (ReadingSession $s) => str_ends_with($s->collection_key, '_full'))->count();
             if ($full > 0 || $ofGroup->contains(fn (ReadingSession $s) => str_ends_with($s->collection_key, '_short'))) {
                 $line .= ' · كامل '.$this->pct($full, $ofGroup->count());
@@ -222,17 +222,17 @@ class AdminReportService
 
         $continued = $sessions->where('source', 'continue')->count();
         if ($continued > 0) {
-            $lines[] = "• كمّلوا للكامل بعد المختصر: {$continued}";
+            $lines[] = "• أكملوا الورد الكامل بعد المختصر: {$continued}";
         }
 
         $sources = ['reminder' => 'من التذكير', 'direct' => 'تذكير مباشر', 'manual' => 'من الأزرار'];
-        $lines[] = '• من وين فتحوا: '.collect($sources)
+        $lines[] = '• مصدر الفتح: '.collect($sources)
             ->map(fn (string $label, string $source) => $label.' '.$this->pct($fresh->where('source', $source)->count(), $fresh->count()))
             ->implode(' · ');
 
         $hours = $fresh->whereNotNull('local_hour')->countBy('local_hour')->sortDesc()->take(3);
         if ($hours->isNotEmpty()) {
-            $lines[] = '• أكتر ساعات القراءة (على توقيتهم): '.$hours
+            $lines[] = '• أكثر ساعات القراءة (على توقيتهم): '.$hours
                 ->map(fn (int $n, int $hour) => ReminderScheduleCalculator::format12Hour(sprintf('%02d:00', $hour))." ({$n})")
                 ->implode(' · ');
         }
@@ -256,7 +256,7 @@ class AdminReportService
             return '';
         }
 
-        $lines = ['🚪 <b>وين بيوقفوا؟</b>'];
+        $lines = ['🚪 <b>أين يتوقفون؟</b>'];
         foreach ($stopped as $group) {
             /** @var ReadingSession $first */
             $first = $group->first();
@@ -264,7 +264,7 @@ class AdminReportService
             $card = (int) $stops->keys()->first();
             $average = (int) round($group->avg(fn (ReadingSession $s) => $s->furthest / max(1, $s->total)) * 100);
             $lines[] = '• '.$this->collectionLabel($first)
-                .": {$group->count()} ما كمّلوا · أكتر وقفة عند الذكر {$card} من {$first->total} ({$stops->first()} منهم) · بالمعدل وصلوا {$average}%";
+                .": {$group->count()} لم يُكملوا · أكثر توقف عند الذكر {$card} من {$first->total} ({$stops->first()} منهم) · وصلوا في المتوسط إلى {$average}%";
         }
 
         return implode("\n", $lines);
@@ -272,41 +272,41 @@ class AdminReportService
 
     private function usageSection(Carbon $since): string
     {
-        $lines = ['🌟 <b>استعمالات تانية</b>'];
+        $lines = ['🌟 <b>استخدامات أخرى</b>'];
 
         $additional = $this->topMeta('additional_item', 'item', $since, 3);
         if ($additional !== []) {
-            $lines[] = '• أكتر الأذكار الإضافية: '.implode(' · ', $additional);
+            $lines[] = '• أكثر الأذكار الإضافية: '.implode(' · ', $additional);
         }
 
         $saved = BotEvent::query()->where('event', 'wird_saved')->where('created_at', '>=', $since)->get(['meta']);
         if ($saved->isNotEmpty()) {
-            $lines[] = "• طلبوا الورد كامل {$saved->count()} مرة (صور ".$saved->where('meta.format', 'images')->count()
+            $lines[] = "• طُلب الورد كاملًا {$saved->count()} مرة (صور ".$saved->where('meta.format', 'images')->count()
                 .' · PDF '.$saved->where('meta.format', 'pdf')->count().')';
         }
 
         $topics = __('bot.help_topics');
         $help = $this->topMeta('help_topic', 'topic', $since, 3, fn (string $key) => $topics[$key]['label'] ?? $key);
         if ($help !== []) {
-            $lines[] = '• أكتر أسئلة المساعدة: '.implode(' · ', $help);
+            $lines[] = '• أكثر أسئلة المساعدة: '.implode(' · ', $help);
         }
 
         $onboarded = User::query()->where('onboarding_state', OnboardingState::Completed);
         $direct = (clone $onboarded)->where('reminder_style', 'direct')->count();
         $followUp = (clone $onboarded)->where('follow_up_enabled', true)->count();
-        $lines[] = "• شكل التذكير: مباشر {$direct} · تنبيه ".((clone $onboarded)->count() - $direct)." · التذكير التاني شغّال عند {$followUp}";
+        $lines[] = "• شكل التذكير: مباشر {$direct} · تنبيه ".((clone $onboarded)->count() - $direct)." · التذكير الثاني مفعّل لدى {$followUp}";
 
         $unclear = $this->eventCount(BotEventRecorder::UNKNOWN_TEXT, $since);
         if ($unclear > 0) {
-            $lines[] = "• رسائل ما فهمها البوت: {$unclear} (التفاصيل بـ bot:stats)";
+            $lines[] = "• رسائل لم يفهمها البوت: {$unclear} (التفاصيل في bot:stats)";
         }
 
         $feedback = Feedback::query()->where('created_at', '>=', $since)->count();
         $unanswered = Feedback::query()->whereNull('replied_at')->count();
-        $lines[] = "• 💬 ملاحظات جديدة: {$feedback} · بلا رد (الكل): {$unanswered}";
+        $lines[] = "• 💬 ملاحظات جديدة: {$feedback} · دون رد (الإجمالي): {$unanswered}";
 
         $groups = GroupChat::query()->where('bot_member', true);
-        $lines[] = '• 👥 غروبات: '.(clone $groups)->where('enabled', true)->count().' شغّالة من '.(clone $groups)->count();
+        $lines[] = '• 👥 المجموعات: '.(clone $groups)->where('enabled', true)->count().' مفعّلة من '.(clone $groups)->count();
 
         return implode("\n", $lines);
     }

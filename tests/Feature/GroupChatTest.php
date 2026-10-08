@@ -116,7 +116,7 @@ class GroupChatTest extends TestCase
         $this->press('g:ask:tz', 1);
         $this->handle($this->groupMessage('كوكب المريخ', replyTo: 5));
         $this->assertNull(GroupChat::query()->firstWhere('chat_id', self::CHAT)->timezone);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما عرفت'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لم أتعرّف على'));
 
         $this->handle($this->groupMessage('تركيا', replyTo: 5));
         $group = GroupChat::query()->firstWhere('chat_id', self::CHAT);
@@ -133,7 +133,7 @@ class GroupChatTest extends TestCase
         $this->handle($this->groupMessage('تركيا', replyTo: 5, from: 2002));
 
         $this->assertNull(GroupChat::query()->firstWhere('chat_id', self::CHAT)->timezone);
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لمشرفين الغروب'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لمشرفي المجموعة'));
     }
 
     public function test_ordinary_replies_to_the_bot_are_ignored(): void
@@ -150,7 +150,7 @@ class GroupChatTest extends TestCase
 
         $this->handle($this->groupMessage('/settings@AneesAdhkarBot'));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
-            && str_contains((string) ($request['text'] ?? ''), 'أَنِيس بهالغروب'));
+            && str_contains((string) ($request['text'] ?? ''), 'أَنِيس في هذه المجموعة'));
     }
 
     public function test_removing_the_bot_stops_the_posts(): void

@@ -73,7 +73,7 @@ class FeedbackTest extends TestCase
         $this->handle($this->telegramMediaPayload(['voice' => ['file_id' => 'v1', 'duration' => 3]], 2));
 
         $this->assertSame('voice', Feedback::query()->sole()->kind);
-        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما بقدر أسمع'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لا أستطيع سماع'));
     }
 
     public function test_keyboard_buttons_and_cancel_close_the_prompt(): void
@@ -86,7 +86,7 @@ class FeedbackTest extends TestCase
 
         $this->handle($this->telegramCallbackPayload('feedback:start', 4));
         $this->handle($this->telegramCallbackPayload('feedback:cancel', 5));
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما بعتنا شي'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'لم نرسل شيئًا'));
         $this->handle($this->telegramMessagePayload('كلام تاني', 6));
 
         $this->assertSame(0, Feedback::query()->count());
@@ -103,7 +103,7 @@ class FeedbackTest extends TestCase
         $this->handle($this->telegramMessagePayload('تاني ملاحظة', 4));
 
         $this->assertSame(1, Feedback::query()->count());
-        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ملاحظات كتير'));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ملاحظات كثيرة'));
     }
 
     public function test_admin_messages_that_are_not_replies_to_feedback_work_as_usual(): void

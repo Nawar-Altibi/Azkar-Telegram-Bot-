@@ -133,7 +133,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringNotContainsString('أذكار الصباح', $text);
         $this->assertStringNotContainsString('💡', $text);
 
-        $this->assertSame([['text' => '➡️ التالي', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
+        $this->assertSame([['text' => '⬅️ التالي', 'callback_data' => 'rt:b:a:1']], $markup['inline_keyboard'][0]);
         $this->assertSame('sv:t:b:a', $markup['inline_keyboard'][1][0]['callback_data']);
         $this->assertSame('📥 أرسل الورد كاملًا', $markup['inline_keyboard'][1][0]['text']);
         $this->assertCount(2, $markup['inline_keyboard']);
@@ -146,7 +146,7 @@ class BedtimeWakingTest extends TestCase
         $this->message('🛌 أذكار النوم', 40);
         $this->message('🛌 أذكار النوم', 41);
 
-        $tips = collect(Http::recorded())->filter(fn ($pair) => str_contains((string) ($pair[0]['text'] ?? ''), 'عم تقرأ بالعتمة'));
+        $tips = collect(Http::recorded())->filter(fn ($pair) => str_contains((string) ($pair[0]['text'] ?? ''), 'هل تقرأ في الظلام'));
         $this->assertCount(1, $tips);
         $this->assertStringContainsString('help:topic:night', (string) $tips->first()[0]['reply_markup']);
 
@@ -210,9 +210,11 @@ class BedtimeWakingTest extends TestCase
         $this->assertStringContainsString('الذكر 2 من 13', (string) $request['text']);
         $this->assertStringContainsString('آية الكرسي', (string) $request['text']);
         $this->assertStringContainsString('💡 الفضل', (string) $request['text']);
-        // Next fills a whole row so it is the easiest button to hit; previous sits under it.
-        $this->assertSame([['text' => '➡️ التالي', 'callback_data' => 'rt:b:a:2']], $rows[0]);
-        $this->assertSame([['text' => 'السابق ⬅️', 'callback_data' => 'rt:b:a:0']], $rows[1]);
+        // One row read right to left: previous on the right, next on the left.
+        $this->assertSame([
+            ['text' => '⬅️ التالي', 'callback_data' => 'rt:b:a:2'],
+            ['text' => 'السابق ➡️', 'callback_data' => 'rt:b:a:0'],
+        ], $rows[0]);
 
         $this->press('rt:b:a:0', 41);
         $this->assertStringContainsString('الذكر 1 من 13', (string) $this->lastSent('editMessageText')['text']);
@@ -269,7 +271,7 @@ class BedtimeWakingTest extends TestCase
         $this->user();
         $this->app->instance(AdhkarPdfService::class, new class(app(AdhkarContentService::class)) extends AdhkarPdfService
         {
-            public function build(string $collectionKey, Collection $items, bool $fullOnly = false): array
+            public function build(string $collectionKey, Collection $items, bool $fullOnly = false, bool $print = false): array
             {
                 throw new RuntimeException('pdf unavailable');
             }
