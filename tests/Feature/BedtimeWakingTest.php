@@ -50,7 +50,7 @@ class BedtimeWakingTest extends TestCase
         $this->assertSame(20, count($this->keys('morning_full')));
         $this->assertSame(9, count($this->keys('evening_short')));
         $this->assertSame(19, count($this->keys('evening_full')));
-        $this->assertSame(8, count($this->keys('additional')));
+        $this->assertSame(10, count($this->keys('additional')));
 
         $second = app(ContentSyncService::class)->sync();
         $this->assertSame(0, $second['created']);
