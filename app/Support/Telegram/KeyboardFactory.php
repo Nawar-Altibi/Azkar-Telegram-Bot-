@@ -495,8 +495,11 @@ class KeyboardFactory
                 $this->rtl([['text' => '🌅 أذكار الصباح'], ['text' => '🌙 أذكار المساء']]),
                 $this->rtl([['text' => '☀️ أذكار الاستيقاظ'], ['text' => '🛌 أذكار النوم']]),
                 $this->rtl([['text' => '🕌 أذكار الصلاة'], ['text' => '🌟 أذكار إضافية']]),
-                $this->rtl([['text' => '⚙️ الإعدادات'], ['text' => '❓ المساعدة والشرح']]),
-                [['text' => __('bot.feedback_button')]],
+                $this->rtl([
+                    ['text' => '⚙️ الإعدادات', 'style' => 'primary'],
+                    ['text' => '❓ المساعدة والشرح', 'style' => 'primary'],
+                ]),
+                [['text' => __('bot.feedback_button'), 'style' => 'success']],
             ],
             'resize_keyboard' => true,
             'input_field_placeholder' => 'اختر من الأزرار 👇',

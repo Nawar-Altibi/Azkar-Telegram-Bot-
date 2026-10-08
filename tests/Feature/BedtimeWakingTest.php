@@ -111,6 +111,9 @@ class BedtimeWakingTest extends TestCase
         $this->assertSame(['❓ المساعدة والشرح', '⚙️ الإعدادات'], array_column($keyboard['keyboard'][3], 'text'));
         $this->assertSame(['💬 أرسل ملاحظة أو اقتراحًا'], array_column($keyboard['keyboard'][4], 'text'));
         $this->assertCount(5, $keyboard['keyboard']);
+        $this->assertSame(['primary', 'primary'], array_column($keyboard['keyboard'][3], 'style'));
+        $this->assertSame(['success'], array_column($keyboard['keyboard'][4], 'style'));
+        $this->assertSame([], array_column($keyboard['keyboard'][0], 'style'));
     }
 
     public function test_bedtime_button_opens_the_first_card_immediately(): void
