@@ -24,5 +24,6 @@ yarn-error.log
 
 .vercel
 .env*
+!/deploy/ovh/.env.example
 /workers/*/node_modules
 /workers/*/.wrangler

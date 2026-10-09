@@ -1,0 +1,91 @@
+# OVH VPS stack: PostgreSQL, the web app, the queue worker, the scheduler, and Caddy for HTTPS.
+# Secrets live in deploy/ovh/.env on the server (see deploy/ovh/.env.example); it is never committed.
+# queue and scheduler sit behind the "live" profile so a staged copy never sends reminders twice
+# while another deployment still owns the bot: start them with `--profile live` only at cutover.
+name: azkar
+
+x-logging: &logging
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "3"
+
+x-app: &app
+    build:
+        context: ../..
+    image: azkar-bot:ovh
+    restart: unless-stopped
+    env_file:
+        - .env
+    volumes:
+        - storage:/var/www/html/storage
+    logging: *logging
+    depends_on:
+        db:
+            condition: service_healthy
+
+services:
+    db:
+        image: postgres:18
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE:-azkar}
+            POSTGRES_USER: ${DB_USERNAME:-azkar}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in deploy/ovh/.env}
+        volumes:
+            - pgdata:/var/lib/postgresql
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+        logging: *logging
+
+    web:
+        <<: *app
+        healthcheck:
+            test: ["CMD", "curl", "-fsS", "http://127.0.0.1/up"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 60s
+
+    queue:
+        <<: *app
+        command: ["queue"]
+        profiles: ["live"]
+        depends_on:
+            web:
+                condition: service_healthy
+
+    scheduler:
+        <<: *app
+        command: ["scheduler"]
+        profiles: ["live"]
+        depends_on:
+            web:
+                condition: service_healthy
+
+    caddy:
+        image: caddy:2
+        restart: unless-stopped
+        environment:
+            APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN must be set in deploy/ovh/.env}
+        ports:
+            - "80:80"
+            - "443:443"
+            - "443:443/udp"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        logging: *logging
+        depends_on:
+            web:
+                condition: service_healthy
+
+volumes:
+    pgdata:
+    storage:
+    caddy_data:
+    caddy_config:

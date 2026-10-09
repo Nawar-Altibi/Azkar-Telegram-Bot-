@@ -8,6 +8,7 @@ vendor
 .env
 .env.backup
 .env.production
+deploy/ovh/.env
 database/*.sqlite
 database/*.sqlite-journal
 storage/logs/*
