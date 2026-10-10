@@ -12,6 +12,10 @@ Schedule::command('adhkar:dispatch-due-reminders')
     ->everyMinute()
     ->withoutOverlapping();
 
+Schedule::command('adhkar:post-due-groups')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 Schedule::command('adhkar:recover-stale')
     ->everyFiveMinutes()
     ->withoutOverlapping();

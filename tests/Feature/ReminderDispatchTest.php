@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\ContentSyncService;
 use App\Services\ReminderDispatchService;
 use App\Services\StaleRecoveryService;
+use App\Services\UserSettingsService;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -60,8 +61,9 @@ class ReminderDispatchTest extends TestCase
         $this->assertTrue($user->fresh()->next_morning_at->isFuture());
     }
 
-    public function test_unique_constraint_rollback_does_not_advance_next_time(): void
+    public function test_unique_constraint_with_pending_log_redispatches_and_advances_next_time(): void
     {
+        Bus::fake([SendAdhkarReminderJob::class]);
         $user = User::factory()->create([
             'reminders_enabled' => true,
             'timezone' => 'UTC',
@@ -70,7 +72,7 @@ class ReminderDispatchTest extends TestCase
             'next_evening_at' => now()->addHours(8),
         ]);
 
-        ReminderLog::factory()->create([
+        $log = ReminderLog::factory()->create([
             'user_id' => $user->id,
             'reminder_type' => ReminderType::Morning,
             'scheduled_local_date' => $user->next_morning_at->timezone('UTC')->toDateString(),
@@ -81,9 +83,68 @@ class ReminderDispatchTest extends TestCase
         $before = $user->next_morning_at->copy();
         $claimed = app(ReminderDispatchService::class)->claimOne($user->fresh(), ReminderType::Morning);
 
-        $this->assertFalse($claimed);
-        $this->assertTrue($user->fresh()->next_morning_at->equalTo($before));
+        $this->assertTrue($claimed);
+        $this->assertTrue($user->fresh()->next_morning_at->gt($before));
         $this->assertSame(1, ReminderLog::query()->where('user_id', $user->id)->count());
+        Bus::assertDispatched(SendAdhkarReminderJob::class, fn (SendAdhkarReminderJob $job) => $job->reminderLogId === $log->id);
+    }
+
+    public function test_unique_constraint_with_already_sent_log_resends_when_time_was_moved_later(): void
+    {
+        Bus::fake([SendAdhkarReminderJob::class]);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-10 18:30:00'));
+        $user = User::factory()->create([
+            'reminders_enabled' => true,
+            'timezone' => 'Asia/Damascus',
+            'morning_time' => '08:33:00',
+            'evening_time' => '21:04:00',
+            'next_morning_at' => now()->addDay(),
+            'next_evening_at' => now()->subMinutes(26),
+        ]);
+
+        $log = ReminderLog::factory()->create([
+            'user_id' => $user->id,
+            'reminder_type' => ReminderType::Evening,
+            'scheduled_local_date' => '2026-10-10',
+            'scheduled_for' => now()->subHours(4),
+            'status' => ReminderLogStatus::Sent,
+            'sent_at' => now()->subHours(4),
+        ]);
+
+        $claimed = app(ReminderDispatchService::class)->claimOne($user->fresh(), ReminderType::Evening);
+
+        $this->assertTrue($claimed);
+        $log->refresh();
+        $this->assertSame(ReminderLogStatus::Pending, $log->status);
+        $this->assertNull($log->sent_at);
+        $this->assertSame('2026-10-11 18:04:00', $user->fresh()->next_evening_at->toDateTimeString());
+        Bus::assertDispatched(SendAdhkarReminderJob::class, fn (SendAdhkarReminderJob $job) => $job->reminderLogId === $log->id);
+    }
+
+    public function test_changing_evening_time_after_todays_send_schedules_later_today(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-10 15:00:00'));
+        $user = User::factory()->create([
+            'reminders_enabled' => true,
+            'timezone' => 'Asia/Damascus',
+            'morning_time' => '06:00:00',
+            'evening_time' => '17:00:00',
+            'next_morning_at' => now()->addDay(),
+            'next_evening_at' => now()->addDay(),
+        ]);
+
+        ReminderLog::factory()->create([
+            'user_id' => $user->id,
+            'reminder_type' => ReminderType::Evening,
+            'scheduled_local_date' => '2026-10-10',
+            'scheduled_for' => now()->subHour(),
+            'status' => ReminderLogStatus::Sent,
+            'sent_at' => now()->subHour(),
+        ]);
+
+        app(UserSettingsService::class)->updateEveningTime($user->fresh(), '21:04');
+
+        $this->assertSame('2026-10-10 18:04:00', $user->fresh()->next_evening_at->toDateTimeString());
     }
 
     public function test_recovery_redispatches_stale_pending_logs_and_exhausts(): void
@@ -283,11 +344,11 @@ class ReminderDispatchTest extends TestCase
         $this->assertSame(1, app(ReminderDispatchService::class)->claimDue());
         $advanced = $user->fresh()->next_morning_at;
 
-        // A second tick that loaded the row before the first committed.
-        $this->assertFalse(app(ReminderDispatchService::class)->claimOne($staleCopy, ReminderType::Morning));
+        // A second tick that loaded the row before the first committed: re-dispatch only, do not skip a day.
+        $this->assertTrue(app(ReminderDispatchService::class)->claimOne($staleCopy, ReminderType::Morning));
         $this->assertSame(1, ReminderLog::query()->count());
         $this->assertTrue($advanced->equalTo($user->fresh()->next_morning_at));
-        Bus::assertDispatchedTimes(SendAdhkarReminderJob::class, 1);
+        Bus::assertDispatched(SendAdhkarReminderJob::class);
     }
 
     public function test_stale_recovery_service_skips_inside_the_interval_and_under_a_held_lock(): void

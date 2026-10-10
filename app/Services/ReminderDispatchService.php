@@ -12,6 +12,7 @@ use App\Services\Telegram\TelegramClient;
 use DateTimeInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -132,26 +133,15 @@ class ReminderDispatchService
                 ]);
 
                 // Schedule from now, not from $dueAt, so a long outage yields one late reminder instead of one per missed day.
-                $next = ReminderScheduleCalculator::calculateNext(
-                    $user->timezone,
-                    (string) $localTime,
-                    $dueAt->copy()->max(now()),
-                );
-
-                if ($type === ReminderType::Morning) {
-                    $user->next_morning_at = $next;
-                } else {
-                    $user->next_evening_at = $next;
-                }
-                $user->save();
+                $this->advanceNext($user, $type, (string) $localTime, $dueAt);
 
                 return $log;
             });
         } catch (UniqueConstraintViolationException) {
-            return null;
+            return $this->resolveExistingClaim($user, $type, $dueAt, $localDate, (string) $localTime);
         } catch (QueryException $exception) {
             if ($this->isUniqueViolation($exception)) {
-                return null;
+                return $this->resolveExistingClaim($user, $type, $dueAt, $localDate, (string) $localTime);
             }
 
             throw $exception;
@@ -160,6 +150,82 @@ class ReminderDispatchService
         $this->dispatchJob($log->id);
 
         return $log->id;
+    }
+
+    /**
+     * A unique day key means this slot was already claimed.
+     * Pending → re-dispatch. Terminal while still due (e.g. user moved the time later today) →
+     * reuse the row for a fresh send, then advance next_*_at so the user cannot stay stuck.
+     */
+    private function resolveExistingClaim(
+        User $user,
+        ReminderType $type,
+        DateTimeInterface $dueAt,
+        string $localDate,
+        string $localTime,
+    ): ?int {
+        $existing = ReminderLog::query()
+            ->where('user_id', $user->id)
+            ->where('reminder_type', $type)
+            ->whereDate('scheduled_local_date', $localDate)
+            ->first();
+
+        $fresh = User::query()->find($user->id);
+        if ($fresh === null || ! $this->isStillDue($fresh, $type, now())) {
+            if ($existing !== null && $existing->status === ReminderLogStatus::Pending) {
+                $this->dispatchJob($existing->id);
+
+                return $existing->id;
+            }
+
+            return null;
+        }
+
+        $this->advanceNext($fresh, $type, $localTime, $dueAt);
+
+        if ($existing === null) {
+            return null;
+        }
+
+        if ($existing->status !== ReminderLogStatus::Pending) {
+            $existing->update([
+                'scheduled_for' => $dueAt,
+                'status' => ReminderLogStatus::Pending,
+                'collection_key' => $this->content->collectionKey($fresh->mode ?? AdhkarMode::Short, $type),
+                'telegram_message_id' => null,
+                'sent_at' => null,
+                'reading_started_at' => null,
+                'follow_up_sent_at' => null,
+                'completed_at' => null,
+                'error_message' => null,
+                'retry_count' => 0,
+                'dispatch_attempts' => 0,
+                'last_dispatch_attempt_at' => null,
+                'content_version_map' => null,
+                'content_snapshot_hash' => null,
+            ]);
+        }
+
+        $this->dispatchJob($existing->id);
+
+        return $existing->id;
+    }
+
+    private function advanceNext(User $user, ReminderType $type, string $localTime, DateTimeInterface $dueAt): void
+    {
+        $after = $dueAt instanceof Carbon ? $dueAt->copy() : Carbon::parse($dueAt);
+        $next = ReminderScheduleCalculator::calculateNext(
+            $user->timezone,
+            $localTime,
+            $after->max(now()),
+        );
+
+        if ($type === ReminderType::Morning) {
+            $user->next_morning_at = $next;
+        } else {
+            $user->next_evening_at = $next;
+        }
+        $user->save();
     }
 
     public function recoverStalePending(): int
@@ -227,7 +293,9 @@ class ReminderDispatchService
         $message = $exception->getMessage();
 
         return $sqlState === '23000'
+            || $sqlState === '23505'
             || str_contains($message, 'UNIQUE constraint failed')
-            || str_contains($message, 'Duplicate entry');
+            || str_contains($message, 'Duplicate entry')
+            || str_contains($message, 'duplicate key');
     }
 }
