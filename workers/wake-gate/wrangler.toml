@@ -2,9 +2,10 @@ name = "anees-wake-gate"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
-# Every minute, but the bot is only called when its next work is due (see src/index.js).
+# Retired: the bot moved to the OVH VPS, whose own scheduler ticks every minute.
+# Restore ["* * * * *"] only if the bot runs on Vercel again (it was called only when work was due, see src/index.js).
 [triggers]
-crons = ["* * * * *"]
+crons = []
 
 [[durable_objects.bindings]]
 name = "WAKE_STATE"
