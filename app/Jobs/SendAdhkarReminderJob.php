@@ -32,7 +32,12 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 180;
 
-    public function __construct(public readonly int $reminderLogId) {}
+    public const QUEUE = 'reminders';
+
+    public function __construct(public readonly int $reminderLogId)
+    {
+        $this->onQueue(self::QUEUE);
+    }
 
     public function uniqueId(): string
     {

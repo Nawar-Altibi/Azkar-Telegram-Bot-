@@ -22,4 +22,6 @@ Schedule::command('adhkar:send-follow-ups')
 
 Schedule::command('bot:prune-events')->daily();
 
+Schedule::command('bot:prune-updates')->dailyAt('03:00')->withoutOverlapping();
+
 Schedule::command('bot:weekly-report')->hourly();

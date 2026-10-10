@@ -8,7 +8,7 @@ Group=www-data
 Restart=always
 RestartSec=5
 WorkingDirectory=/var/www/azkar
-ExecStart=/usr/bin/php /var/www/azkar/artisan queue:work --sleep=1 --tries=3 --backoff=5,30,120 --max-time=3600
+ExecStart=/usr/bin/php /var/www/azkar/artisan queue:work --queue=default,reminders --sleep=1 --tries=3 --backoff=5,30,120 --max-time=3600
 TimeoutStopSec=60
 KillMode=process
 

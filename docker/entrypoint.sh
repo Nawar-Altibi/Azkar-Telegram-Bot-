@@ -143,7 +143,8 @@ case "$role" in
         ;;
     queue)
         wait_for_database
-        exec php artisan queue:work --sleep=1 --tries=3 --backoff=5,30,120 --max-time=3600 --no-interaction
+        # A single worker must keep "default" (user updates) first; extra workers may be pinned to "reminders" only.
+        exec php artisan queue:work --queue="${QUEUE_WORKER_QUEUES:-default,reminders}" --sleep=1 --tries=3 --backoff=5,30,120 --max-time=3600 --no-interaction
         ;;
     scheduler)
         wait_for_database

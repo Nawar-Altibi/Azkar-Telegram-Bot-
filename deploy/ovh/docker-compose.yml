@@ -1,6 +1,9 @@
-# OVH VPS stack: PostgreSQL, the web app, the queue worker, the scheduler, and Caddy for HTTPS.
+# OVH VPS stack: PostgreSQL, the web app, the queue workers, the scheduler, and Caddy for HTTPS.
 # Secrets live in deploy/ovh/.env on the server (see deploy/ovh/.env.example); it is never committed.
-# queue and scheduler sit behind the "live" profile so a staged copy never sends reminders twice
+# "queue" is the only worker on the default queue so one user's updates are handled in order;
+# "reminders" replicas only send reminders. Telegram caps a bot near 30 messages/second, so keep
+# REMINDER_WORKERS at 6 or fewer.
+# queue, reminders and scheduler sit behind the "live" profile so a staged copy never sends reminders twice
 # while another deployment still owns the bot: start them with `--profile live` only at cutover.
 name: azkar
 
@@ -53,6 +56,18 @@ services:
     queue:
         <<: *app
         command: ["queue"]
+        profiles: ["live"]
+        depends_on:
+            web:
+                condition: service_healthy
+
+    reminders:
+        <<: *app
+        command: ["queue"]
+        environment:
+            QUEUE_WORKER_QUEUES: reminders
+        deploy:
+            replicas: ${REMINDER_WORKERS:-3}
         profiles: ["live"]
         depends_on:
             web:

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ReminderLogStatus;
+use App\Jobs\SendAdhkarReminderJob;
 use App\Models\ReminderLog;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
@@ -112,6 +113,7 @@ class CronTickService
 
             if (config('queue.default') !== 'sync') {
                 Artisan::call('queue:work', [
+                    '--queue' => 'default,'.SendAdhkarReminderJob::QUEUE,
                     '--stop-when-empty' => true,
                     '--sleep' => 1,
                     '--max-time' => 20,
