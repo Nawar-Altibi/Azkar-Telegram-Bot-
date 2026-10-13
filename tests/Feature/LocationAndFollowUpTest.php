@@ -6,8 +6,10 @@ use App\Enums\AdhkarMode;
 use App\Enums\OnboardingState;
 use App\Enums\ReminderLogStatus;
 use App\Enums\ReminderType;
+use App\Models\ReadingSession;
 use App\Models\ReminderLog;
 use App\Models\User;
+use App\Services\ContentSyncService;
 use App\Services\CronTickService;
 use App\Services\FollowUpReminderService;
 use App\Services\StaleRecoveryService;
@@ -144,6 +146,82 @@ class LocationAndFollowUpTest extends TestCase
         $this->sentLog($late, now()->subMinutes(70));
         $this->travelTo(Carbon::parse('2026-03-10 13:00:00', 'Asia/Damascus'));
         $this->assertSame(0, $service->sendDue());
+    }
+
+    public function test_reading_the_wird_by_hand_before_the_reminder_closes_the_follow_up(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 05:30:00', 'Asia/Damascus'));
+        app(ContentSyncService::class)->sync();
+        $user = $this->onboardedUser([
+            'follow_up_enabled' => true,
+            'mode' => AdhkarMode::Short,
+            'mode_chosen_at' => now()->subDay(),
+        ]);
+        $this->message('🌅 أذكار الصباح', 1);
+
+        $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
+        $log = $this->sentLog($user, now()->subMinutes(70));
+
+        $this->assertSame(0, app(FollowUpReminderService::class)->sendDue());
+        $this->assertNotNull($log->fresh()->follow_up_sent_at);
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ما زال في وقت أذكار الصباح'));
+    }
+
+    public function test_follow_up_still_goes_out_during_the_hour_after_the_period_ends(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 12:10:00', 'Asia/Damascus'));
+        $morning = $this->onboardedUser(['follow_up_enabled' => true, 'last_interaction_at' => now()->subDay()]);
+        $this->sentLog($morning, now()->subMinutes(70));
+
+        $this->assertSame(1, app(FollowUpReminderService::class)->sendDue());
+
+        $this->travelTo(Carbon::parse('2026-03-10 21:20:00', 'Asia/Damascus'));
+        $evening = $this->onboardedUser([
+            'telegram_id' => 3001,
+            'chat_id' => 3001,
+            'follow_up_enabled' => true,
+            'last_interaction_at' => now()->subDay(),
+        ]);
+        ReminderLog::factory()->create([
+            'user_id' => $evening->id,
+            'reminder_type' => ReminderType::Evening,
+            'collection_key' => 'evening_short',
+            'status' => ReminderLogStatus::Sent,
+            'sent_at' => now()->subMinutes(70),
+            'scheduled_local_date' => '2026-03-10',
+        ]);
+
+        $this->assertSame(1, app(FollowUpReminderService::class)->sendDue());
+    }
+
+    public function test_follow_up_closes_after_the_extra_hour(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 13:10:00', 'Asia/Damascus'));
+        $user = $this->onboardedUser(['follow_up_enabled' => true, 'last_interaction_at' => now()->subDay()]);
+        $log = $this->sentLog($user, now()->subHours(2)->subMinutes(10));
+
+        $this->assertSame(0, app(FollowUpReminderService::class)->sendDue());
+        $this->assertNotNull($log->fresh()->follow_up_sent_at);
+        Http::assertNothingSent();
+    }
+
+    public function test_reading_another_period_still_allows_the_follow_up(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
+        $user = $this->onboardedUser(['follow_up_enabled' => true]);
+        ReadingSession::query()->create([
+            'user_id' => $user->id,
+            'collection_key' => 'evening_short',
+            'phase' => 's',
+            'source' => 'manual',
+            'total' => 9,
+            'furthest' => 1,
+            'started_at' => now()->subMinutes(100),
+            'last_seen_at' => now()->subMinutes(90),
+        ]);
+        $this->sentLog($user, now()->subMinutes(70));
+
+        $this->assertSame(1, app(FollowUpReminderService::class)->sendDue());
     }
 
     public function test_settings_toggle_turns_the_follow_up_on_and_off(): void

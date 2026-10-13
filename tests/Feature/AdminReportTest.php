@@ -3,8 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\AdhkarMode;
+use App\Enums\ReminderLogStatus;
+use App\Enums\ReminderType;
+use App\Jobs\SendAdhkarReminderJob;
 use App\Models\BotEvent;
 use App\Models\ReadingSession;
+use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdminReportService;
 use App\Services\ContentSyncService;
@@ -99,6 +103,65 @@ class AdminReportTest extends TestCase
         $this->assertStringContainsString("أذكار المساء (كامل) — <b>4</b> لم يُكملوه\n      أكثر توقف عند الذكر 3 من 19 (3 منهم)", $report);
         $this->assertStringContainsString('9:00 مساءً — <b>4</b>', $report);
         $this->assertStringContainsString('كيف أكبّر الخط؟ — <b>1</b>', $report);
+    }
+
+    public function test_button_reading_counts_as_opening_and_finishing_marks_the_reminder_done(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 07:00:00', 'Asia/Damascus'));
+        $user = $this->user();
+        $log = ReminderLog::factory()->create([
+            'user_id' => $user->id,
+            'reminder_type' => ReminderType::Morning,
+            'collection_key' => 'morning_short',
+            'status' => ReminderLogStatus::Sent,
+            'sent_at' => now()->subMinutes(20),
+            'scheduled_for' => now()->subMinutes(20),
+            'scheduled_local_date' => '2026-03-10',
+        ]);
+
+        $this->handle($this->telegramMessagePayload('🌅 أذكار الصباح', 1));
+
+        $opened = app(AdminReportService::class)->build(7);
+        $this->assertStringContainsString('فُتح: <b>1</b> (100%)', $opened);
+        $this->assertStringContainsString('🌅 الصباح: <b>فُتح 1 من 1</b> (100%)', $opened);
+        $this->assertSame(ReminderLogStatus::Sent, $log->fresh()->status);
+
+        $last = (int) ReadingSession::query()->sole()->total - 1;
+        $this->handle($this->telegramCallbackPayload("rt:m:s:{$last}", 2));
+
+        $log->refresh();
+        $this->assertSame(ReminderLogStatus::Completed, $log->status);
+        $this->assertNotNull($log->completed_at);
+        $this->assertStringContainsString('ضغطوا «تم»: <b>1</b> (100%)', app(AdminReportService::class)->build(7));
+
+        $this->handle($this->telegramCallbackPayload('reminder:start:'.$log->id.':s', 3));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'سجّلناها من قبل'));
+    }
+
+    public function test_a_reminder_sent_after_the_wird_was_finished_is_recorded_done(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-10 06:30:00', 'Asia/Damascus'));
+        $user = $this->user();
+
+        $this->handle($this->telegramMessagePayload('🌅 أذكار الصباح', 1));
+        $last = (int) ReadingSession::query()->sole()->total - 1;
+        $this->handle($this->telegramCallbackPayload("rt:m:s:{$last}", 2));
+
+        $log = ReminderLog::factory()->create([
+            'user_id' => $user->id,
+            'reminder_type' => ReminderType::Morning,
+            'collection_key' => 'morning_short',
+            'status' => ReminderLogStatus::Pending,
+            'scheduled_for' => now(),
+            'scheduled_local_date' => '2026-03-10',
+        ]);
+
+        SendAdhkarReminderJob::dispatchSync($log->id);
+
+        $log->refresh();
+        $this->assertSame(ReminderLogStatus::Completed, $log->status);
+        $this->assertNotNull($log->completed_at);
+        $this->assertNotNull($log->sent_at);
     }
 
     public function test_weekly_report_goes_out_once_on_friday_morning(): void

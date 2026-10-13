@@ -223,20 +223,21 @@ class KeyboardFactory
         if ($steps !== []) {
             $rows[] = $steps;
         }
-        if (isset($actions['switch_to_full'])) {
-            $rows[] = [['text' => '📖 بدّل إلى الورد الكامل', 'callback_data' => $actions['switch_to_full']]];
-        }
-        if (isset($actions['switch_to_short'])) {
-            $rows[] = [['text' => '🌿 بدّل إلى الورد المختصر', 'callback_data' => $actions['switch_to_short']]];
-        }
+        // Send-all stays in the middle on the first and last cards; the full-wird switch is last and colored.
         if (isset($actions['save'])) {
             $rows[] = [['text' => '📥 أرسل الورد كاملًا', 'callback_data' => $actions['save']]];
         }
-        if (isset($actions['continue'])) {
-            $rows[] = [['text' => 'أكمل الورد الكامل', 'callback_data' => $actions['continue']]];
-        }
         if (isset($actions['done'])) {
             $rows[] = [['text' => '✅ تم', 'callback_data' => $actions['done']]];
+        }
+        if (isset($actions['switch_to_full'])) {
+            $rows[] = [['text' => '📖 بدّل إلى الورد الكامل', 'callback_data' => $actions['switch_to_full'], 'style' => 'success']];
+        }
+        if (isset($actions['switch_to_short'])) {
+            $rows[] = [['text' => '🌿 بدّل إلى الورد المختصر', 'callback_data' => $actions['switch_to_short'], 'style' => 'success']];
+        }
+        if (isset($actions['continue'])) {
+            $rows[] = [['text' => 'أكمل الورد الكامل', 'callback_data' => $actions['continue'], 'style' => 'success']];
         }
 
         return ['inline_keyboard' => $rows];

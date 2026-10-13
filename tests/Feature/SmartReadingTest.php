@@ -10,6 +10,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\ContentSyncService;
 use App\Services\Telegram\TelegramUpdateProcessor;
+use App\Support\Telegram\KeyboardFactory;
 use Carbon\Carbon;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -59,6 +60,46 @@ class SmartReadingTest extends TestCase
         $this->handle($this->telegramCallbackPayload('today:bedtime', 4));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
             && str_starts_with((string) ($request['text'] ?? ''), '🛌 أذكار النوم'));
+    }
+
+    public function test_send_full_wird_stays_in_the_middle_and_the_full_switch_is_last(): void
+    {
+        $keyboard = app(KeyboardFactory::class);
+
+        $first = $keyboard->readingNav([
+            'next' => 'rt:m:s:1',
+            'switch_to_full' => 'md:m:a',
+            'save' => 'sv:t:m:s',
+        ]);
+        $this->assertSame(
+            ['التالي ⬅️', '📥 أرسل الورد كاملًا', '📖 بدّل إلى الورد الكامل'],
+            array_column(array_map(fn (array $row) => $row[0], $first['inline_keyboard']), 'text'),
+        );
+        $this->assertSame('success', $first['inline_keyboard'][2][0]['style']);
+
+        $last = $keyboard->readingNav([
+            'prev' => 'rt:m:s:7',
+            'save' => 'sv:t:m:s',
+            'continue' => 'rt:m:f:0',
+        ]);
+        $this->assertSame(
+            ['➡️ السابق', '📥 أرسل الورد كاملًا', 'أكمل الورد الكامل'],
+            array_column(array_map(fn (array $row) => $row[0], $last['inline_keyboard']), 'text'),
+        );
+        $this->assertSame('success', $last['inline_keyboard'][2][0]['style']);
+
+        $withDone = $keyboard->readingNav([
+            'prev' => 'rd:1:s:7',
+            'save' => 'sv:l:1:s',
+            'continue' => 'rd:1:f:0',
+            'done' => 'reminder:done:1',
+        ]);
+        $this->assertSame(
+            ['➡️ السابق', '📥 أرسل الورد كاملًا', '✅ تم', 'أكمل الورد الكامل'],
+            array_column(array_map(fn (array $row) => $row[0], $withDone['inline_keyboard']), 'text'),
+        );
+        $this->assertSame('success', $withDone['inline_keyboard'][3][0]['style']);
+        $this->assertArrayNotHasKey('style', $withDone['inline_keyboard'][1][0]);
     }
 
     public function test_first_choice_is_remembered_and_can_be_switched(): void

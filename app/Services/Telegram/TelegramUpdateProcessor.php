@@ -18,6 +18,7 @@ use App\Services\BotEventRecorder;
 use App\Services\FeedbackService;
 use App\Services\OnboardingService;
 use App\Services\ReadingSessionRecorder;
+use App\Services\ReminderCompletionService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
 use App\Support\DayPeriod;
@@ -50,6 +51,7 @@ class TelegramUpdateProcessor
         private readonly FeedbackService $feedback,
         private readonly ReadingSessionRecorder $readings,
         private readonly AdminReportService $reports,
+        private readonly ReminderCompletionService $completion,
     ) {}
 
     /**
@@ -1143,6 +1145,12 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if ($log->completed_at !== null || $log->status === ReminderLogStatus::Completed) {
+            $this->safeAnswer($callbackId, __('bot.already_completed'));
+
+            return;
+        }
+
         if (! $this->isCurrentLocalDay($user, $log)) {
             $this->safeAnswer($callbackId);
             $this->reply($user, __('bot.reminder_expired'), $this->keyboards->todayShortcut());
@@ -1431,6 +1439,14 @@ class TelegramUpdateProcessor
 
         if ($isLast && $session['scope'] === 'today') {
             $this->events->record($user, 'reading_completed', ['scope' => 'manual', 'collection' => $headerKey]);
+            $type = match ($session['period'] ?? '') {
+                'm' => ReminderType::Morning,
+                'e' => ReminderType::Evening,
+                default => null,
+            };
+            if ($type !== null) {
+                $this->completion->completeToday($user, $type);
+            }
         }
 
         $opened = $session['opened'] ?? false;

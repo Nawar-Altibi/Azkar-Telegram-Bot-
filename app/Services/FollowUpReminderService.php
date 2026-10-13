@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Enums\AdhkarMode;
 use App\Enums\ReminderLogStatus;
 use App\Enums\ReminderType;
+use App\Models\ReadingSession;
 use App\Models\ReminderLog;
+use App\Models\User;
 use App\Services\Telegram\TelegramClient;
 use App\Support\DayPeriod;
 use App\Support\Telegram\KeyboardFactory;
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * One gentle second reminder, for users who turned it on and have not opened the reminder an hour later.
+ * One gentle second reminder, for users who turned it on and have not read that period's wird an hour later.
  */
 class FollowUpReminderService
 {
@@ -43,7 +45,7 @@ class FollowUpReminderService
 
         foreach ($logs as $log) {
             // Every reason to skip is final once the hour has passed (the user already came back, or the
-            // day or period moved on), so a skipped follow-up is closed too and never re-checked.
+            // day moved on, or the extra hour after the period ended), so a skipped follow-up is closed too.
             if (! $this->shouldSend($log)) {
                 $this->claim($log);
 
@@ -89,8 +91,13 @@ class FollowUpReminderService
             return false;
         }
 
-        // Any use of the bot since the reminder, such as reading the same adhkar from the menu, counts as seen.
+        // Any use of the bot since the reminder, such as opening settings, counts as seen.
         if ($user->last_interaction_at !== null && $log->sent_at !== null && $user->last_interaction_at->gt($log->sent_at)) {
+            return false;
+        }
+
+        // Reading the same period from the buttons counts too, even when it happened before the reminder arrived.
+        if ($this->readThisPeriodToday($log)) {
             return false;
         }
 
@@ -98,7 +105,64 @@ class FollowUpReminderService
         $period = $log->reminder_type === ReminderType::Evening ? 'evening' : 'morning';
 
         return $log->scheduled_local_date?->toDateString() === $today
-            && DayPeriod::forUser($user) === $period;
+            && $this->withinFollowUpWindow($user, $period);
+    }
+
+    /**
+     * The follow-up stays open through the period, and for one more hour after it ends,
+     * so a reminder in the last hour still gets its second message.
+     */
+    private function withinFollowUpWindow(User $user, string $period): bool
+    {
+        if (DayPeriod::forUser($user) === $period) {
+            return true;
+        }
+
+        $endHour = config("adhkar.day_windows.{$period}.1");
+        if (! is_numeric($endHour)) {
+            return false;
+        }
+
+        try {
+            $local = now()->timezone($user->timezone);
+        } catch (Throwable) {
+            return false;
+        }
+
+        $end = $local->copy()->setTime((int) $endHour, 0);
+        if ($local->lt($end)) {
+            return false;
+        }
+
+        return $local->lt($end->copy()->addMinutes(self::DELAY_MINUTES));
+    }
+
+    /**
+     * True when the user already opened this morning or evening wird on the reminder's local day.
+     */
+    private function readThisPeriodToday(ReminderLog $log): bool
+    {
+        $user = $log->user;
+        if ($user === null || $user->timezone === null || $log->scheduled_local_date === null) {
+            return false;
+        }
+
+        try {
+            $start = Carbon::parse($log->scheduled_local_date->toDateString(), $user->timezone)->startOfDay();
+        } catch (Throwable) {
+            return false;
+        }
+
+        $prefix = $log->reminder_type === ReminderType::Evening ? 'evening' : 'morning';
+        $from = $start->copy()->utc();
+        $until = $start->copy()->addDay()->utc();
+
+        return ReadingSession::query()
+            ->where('user_id', $user->id)
+            ->whereIn('collection_key', [$prefix.'_short', $prefix.'_full'])
+            ->where('last_seen_at', '>=', $from)
+            ->where('last_seen_at', '<', $until)
+            ->exists();
     }
 
     private function claim(ReminderLog $log): bool

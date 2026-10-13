@@ -7,6 +7,7 @@ use App\Models\AdhkarCollection;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
+use App\Services\ReminderCompletionService;
 use App\Services\Telegram\TelegramApiException;
 use App\Services\Telegram\TelegramClient;
 use App\Support\Telegram\KeyboardFactory;
@@ -48,6 +49,7 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
         AdhkarContentService $content,
         TelegramClient $telegram,
         KeyboardFactory $keyboards,
+        ReminderCompletionService $completion,
     ): void {
         $log = ReminderLog::query()->with('user')->findOrFail($this->reminderLogId);
 
@@ -96,6 +98,9 @@ class SendAdhkarReminderJob implements ShouldBeUnique, ShouldQueue
                 'error_message' => null,
                 ...($direct['snapshot'] ?? []),
             ]);
+            if ($log->reminder_type !== null && $completion->alreadyFinished($user, $log->reminder_type)) {
+                $completion->completeToday($user, $log->reminder_type);
+            }
         } catch (TelegramApiException $exception) {
             $this->markFailed($log, $user, $exception);
             if (! $exception->isBlockedByUser()) {

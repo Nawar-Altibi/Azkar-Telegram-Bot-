@@ -169,24 +169,20 @@ class AdminReportService
         }
 
         $logs = ReminderLog::query()
+            ->with('user:id,timezone')
             ->where('sent_at', '>=', $since)
             ->whereIn('status', [ReminderLogStatus::Sent, ReminderLogStatus::Completed])
-            ->get(['id', 'reminder_type', 'sent_at', 'status', 'follow_up_sent_at']);
+            ->get(['id', 'user_id', 'reminder_type', 'scheduled_local_date', 'sent_at', 'status', 'follow_up_sent_at']);
         if ($logs->isEmpty()) {
             return implode("\n", ['🔔 <b>التذكيرات</b>', ...$settings, 'لم يُرسَل أي تذكير في هذه الفترة.']);
         }
 
-        $openedAt = ReadingSession::query()
-            ->whereNotNull('reminder_log_id')
-            ->where('started_at', '>=', $since)
-            ->orderBy('started_at')
-            ->get(['reminder_log_id', 'started_at'])
-            ->unique('reminder_log_id')
-            ->mapWithKeys(fn (ReadingSession $session) => [$session->reminder_log_id => $session->started_at]);
+        [$openedAt, $openedAfterFollowUp] = $this->reminderOpenings($logs, $since);
 
         $opened = $logs->filter(fn (ReminderLog $log) => $openedAt->has($log->id));
         $done = $logs->where('status', ReminderLogStatus::Completed)->count();
         $minutes = $opened
+            ->filter(fn (ReminderLog $log) => $openedAt[$log->id]->gte($log->sent_at))
             ->map(fn (ReminderLog $log) => max(0, (int) round($log->sent_at->diffInMinutes($openedAt[$log->id], true))))
             ->sort()
             ->values();
@@ -213,11 +209,73 @@ class AdminReportService
 
         $followUps = $logs->whereNotNull('follow_up_sent_at');
         if ($followUps->isNotEmpty()) {
-            $afterFollowUp = $followUps->filter(fn (ReminderLog $log) => $openedAt->has($log->id) && $openedAt[$log->id]->gte($log->follow_up_sent_at))->count();
+            $afterFollowUp = $followUps->filter(fn (ReminderLog $log) => $openedAfterFollowUp->has($log->id))->count();
             $lines[] = $this->row('التذكير الثاني', "فُتح بعده {$afterFollowUp} من {$followUps->count()}", $this->pct($afterFollowUp, $followUps->count()));
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Openings from the reminder message and from the morning/evening buttons on the same local day.
+     *
+     * @param  Collection<int, ReminderLog>  $logs
+     * @return array{0: Collection<int, Carbon>, 1: Collection<int, true>}
+     */
+    private function reminderOpenings(Collection $logs, Carbon $since): array
+    {
+        $sessions = ReadingSession::query()
+            ->where('started_at', '>=', $since->copy()->subDay())
+            ->get(['user_id', 'reminder_log_id', 'collection_key', 'started_at']);
+
+        $openedAt = [];
+        $afterFollowUp = [];
+
+        foreach ($logs as $log) {
+            $times = $sessions
+                ->filter(fn (ReadingSession $session) => $this->sessionOpensReminder($session, $log))
+                ->map(fn (ReadingSession $session) => $session->started_at)
+                ->filter()
+                ->values();
+            if ($times->isEmpty() || $log->sent_at === null) {
+                continue;
+            }
+
+            $afterSend = $times->filter(fn (Carbon $time) => $time->gte($log->sent_at))->sort()->values();
+            $openedAt[$log->id] = $afterSend->isNotEmpty() ? $afterSend->first() : $times->sort()->first();
+            if ($log->follow_up_sent_at !== null && $times->contains(fn (Carbon $time) => $time->gte($log->follow_up_sent_at))) {
+                $afterFollowUp[$log->id] = true;
+            }
+        }
+
+        return [collect($openedAt), collect($afterFollowUp)];
+    }
+
+    private function sessionOpensReminder(ReadingSession $session, ReminderLog $log): bool
+    {
+        if ($session->reminder_log_id !== null && (int) $session->reminder_log_id === (int) $log->id) {
+            return true;
+        }
+
+        $user = $log->user;
+        if ($user === null || $user->timezone === null || $log->scheduled_local_date === null || $session->started_at === null) {
+            return false;
+        }
+
+        if ((int) $session->user_id !== (int) $log->user_id) {
+            return false;
+        }
+
+        $period = $log->reminder_type === ReminderType::Evening ? 'evening' : 'morning';
+        if (ReadingSessionRecorder::group((string) $session->collection_key) !== $period) {
+            return false;
+        }
+
+        try {
+            return $session->started_at->timezone($user->timezone)->toDateString() === $log->scheduled_local_date->toDateString();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**
