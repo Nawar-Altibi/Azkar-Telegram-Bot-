@@ -186,6 +186,7 @@ class EngagementAndAdminUsageTest extends TestCase
 
     public function test_admin_user_command_shows_card_times(): void
     {
+        $this->travelTo('2026-10-16 10:15:00');
         $target = $this->user([
             'telegram_id' => 2001,
             'chat_id' => 2001,
@@ -211,12 +212,13 @@ class EngagementAndAdminUsageTest extends TestCase
         app(TelegramUpdateProcessor::class)->handle($this->telegramMessagePayload('/user @reader1', 1, 9001));
 
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'استخدام @reader1')
-            && str_contains((string) ($request['text'] ?? ''), 'الذكر 1')
+            && str_contains((string) ($request['text'] ?? ''), 'الساعة')
             && str_contains((string) ($request['text'] ?? ''), 'أذكار الصباح'));
 
         $chunks = app(AdminUserUsageService::class)->report('reader1');
         $this->assertNotEmpty($chunks);
         $this->assertStringContainsString('reader1', $chunks[0]);
+        $this->assertStringContainsString('الساعة', $chunks[0]);
         $this->assertSame($admin->id, User::query()->where('chat_id', 9001)->value('id'));
     }
 

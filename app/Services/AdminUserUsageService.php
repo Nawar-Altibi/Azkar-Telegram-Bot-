@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AdhkarCollection;
 use App\Models\ReadingSession;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -12,6 +13,9 @@ use Illuminate\Support\Str;
  */
 class AdminUserUsageService
 {
+    /** @var array<string, list<string>> */
+    private array $labelsByCollection = [];
+
     public function __construct(private readonly AdhkarContentService $content) {}
 
     /**
@@ -90,26 +94,73 @@ class AdminUserUsageService
     {
         $times = $session->card_times;
         if (! is_array($times) || $times === []) {
-            return [];
+            return [__('bot.admin_user_no_card_times')];
         }
 
         ksort($times, SORT_NUMERIC);
+        $labels = $this->labelsFor($session->collection_key);
         $lines = [];
         foreach ($times as $number => $iso) {
-            try {
-                $time = Carbon::parse((string) $iso)->timezone($timezone)->format('g:i A');
-            } catch (\Throwable) {
+            $n = (int) $number;
+            if ($n < 1) {
                 continue;
             }
+
+            $clock = $this->clockLabel((string) $iso, $timezone);
+            if ($clock === null) {
+                continue;
+            }
+
             $lines[] = __('bot.admin_user_card', [
-                'n' => (int) $number,
-                'time' => e(ReminderScheduleCalculator::format12Hour(
-                    Carbon::parse((string) $iso)->timezone($timezone)->format('H:i')
-                ) ?: $time),
+                'n' => $n,
+                'title' => e($labels[$n - 1] ?? __('bot.admin_user_card_fallback', ['n' => $n])),
+                'time' => e($clock),
             ]);
         }
 
-        return $lines;
+        return $lines !== [] ? $lines : [__('bot.admin_user_no_card_times')];
+    }
+
+    private function clockLabel(string $iso, string $timezone): ?string
+    {
+        try {
+            $local = Carbon::parse($iso)->timezone($timezone);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $formatted = ReminderScheduleCalculator::format12Hour($local->format('H:i'));
+
+        return $formatted !== '' ? $formatted : $local->format('g:i A');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function labelsFor(string $collectionKey): array
+    {
+        if (isset($this->labelsByCollection[$collectionKey])) {
+            return $this->labelsByCollection[$collectionKey];
+        }
+
+        $collection = AdhkarCollection::query()
+            ->where('key', $collectionKey)
+            ->where('active', true)
+            ->first();
+        if ($collection === null) {
+            return $this->labelsByCollection[$collectionKey] = [];
+        }
+
+        $labels = [];
+        foreach ($collection->items()->where('adhkar_items.active', true)->get() as $item) {
+            $title = trim((string) ($item->title ?: ''));
+            if ($title === '') {
+                $title = Str::limit(preg_replace('/\s+/u', ' ', (string) $item->arabic_text) ?? '', 36, '…');
+            }
+            $labels[] = $title !== '' ? $title : 'الذكر';
+        }
+
+        return $this->labelsByCollection[$collectionKey] = $labels;
     }
 
     /**
