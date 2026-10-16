@@ -131,7 +131,7 @@ class LocationAndFollowUpTest extends TestCase
         $this->travelTo(Carbon::parse('2026-03-10 07:10:00', 'Asia/Damascus'));
         $service = app(FollowUpReminderService::class);
 
-        $off = $this->onboardedUser(['telegram_id' => 2001, 'chat_id' => 2001]);
+        $off = $this->onboardedUser(['telegram_id' => 2001, 'chat_id' => 2001, 'follow_up_enabled' => false]);
         $this->sentLog($off, now()->subMinutes(70));
 
         $early = $this->onboardedUser(['telegram_id' => 2002, 'chat_id' => 2002, 'follow_up_enabled' => true]);
@@ -226,7 +226,7 @@ class LocationAndFollowUpTest extends TestCase
 
     public function test_settings_toggle_turns_the_follow_up_on_and_off(): void
     {
-        $user = $this->onboardedUser();
+        $user = $this->onboardedUser(['follow_up_enabled' => false]);
 
         $this->press('settings:follow_up', 1);
         $this->assertTrue($user->fresh()->follow_up_enabled);

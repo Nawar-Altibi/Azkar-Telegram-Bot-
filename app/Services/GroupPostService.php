@@ -14,13 +14,14 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Posts the morning and evening wird as page images in groups at the times their admins chose.
+ * Posts the morning and evening wird in groups at the times their admins chose (images or text).
  */
 class GroupPostService
 {
     public function __construct(
         private readonly AdhkarContentService $content,
         private readonly WirdSender $wirds,
+        private readonly TelegramClient $telegram,
     ) {}
 
     public function hasDue(): bool
@@ -114,12 +115,22 @@ class GroupPostService
             return false;
         }
 
-        $caption = __('bot.group.post_caption', [
+        $asText = ($group->delivery_format ?? 'images') === 'text';
+        $caption = __($asText ? 'bot.group.post_caption_text' : 'bot.group.post_caption', [
             'icon' => $type === ReminderType::Morning ? '🌅' : '🌇',
             'title' => e($this->content->wirdTitle($key)),
         ]);
 
         try {
+            if ($asText) {
+                $this->telegram->sendMessage($group->chat_id, $caption);
+                foreach ($this->content->offlineMessages($key, $items) as $message) {
+                    $this->telegram->sendMessage($group->chat_id, $message);
+                }
+
+                return true;
+            }
+
             if (! $this->wirds->sendImages($group->chat_id, $key, $items, false, null, $caption)) {
                 $this->wirds->sendPdf($group->chat_id, $key, $items, false, $caption);
             }

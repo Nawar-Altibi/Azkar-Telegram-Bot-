@@ -16,6 +16,12 @@ class User extends Model
     /** @use HasFactory<UserFactory> */
     use HasFactory;
 
+    protected $attributes = [
+        'reminder_style' => 'direct',
+        'follow_up_enabled' => true,
+        'weekly_summary_enabled' => true,
+    ];
+
     protected $fillable = [
         'telegram_id',
         'chat_id',
@@ -32,6 +38,11 @@ class User extends Model
         'keyboard_persistent',
         'reminder_style',
         'follow_up_enabled',
+        'weekly_summary_enabled',
+        'last_weekly_summary_at',
+        'time_fit_asked_at',
+        'comeback_sent_at',
+        'feedback_nudge_at',
         'onboarding_state',
         'awaiting_input',
         'next_morning_at',
@@ -48,6 +59,7 @@ class User extends Model
             'reminders_enabled' => 'boolean',
             'keyboard_persistent' => 'boolean',
             'follow_up_enabled' => 'boolean',
+            'weekly_summary_enabled' => 'boolean',
             'mode' => AdhkarMode::class,
             'mode_chosen_at' => 'datetime',
             'onboarding_state' => OnboardingState::class,
@@ -55,6 +67,10 @@ class User extends Model
             'next_evening_at' => 'datetime',
             'paused_at' => 'datetime',
             'last_interaction_at' => 'datetime',
+            'last_weekly_summary_at' => 'datetime',
+            'time_fit_asked_at' => 'datetime',
+            'comeback_sent_at' => 'datetime',
+            'feedback_nudge_at' => 'datetime',
         ];
     }
 

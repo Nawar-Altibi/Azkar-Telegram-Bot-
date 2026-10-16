@@ -30,10 +30,10 @@ class DirectReminderAndImagesTest extends TestCase
 
     public function test_settings_switch_between_nudge_and_direct_reminders(): void
     {
-        $user = $this->user();
+        $user = $this->user(['reminder_style' => 'nudge']);
 
         $this->press('settings:style', 1);
-        $this->assertNotSame('direct', $user->fresh()->reminder_style);
+        $this->assertSame('nudge', $user->fresh()->reminder_style);
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'كيف تريد أن يصلك التذكير')
             && str_contains((string) ($request['text'] ?? ''), 'الخيار الحالي: <b>رسالة تنبيه</b>')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:style:direct')
@@ -83,7 +83,7 @@ class DirectReminderAndImagesTest extends TestCase
 
     public function test_nudge_style_still_sends_the_choice_message(): void
     {
-        $user = $this->user();
+        $user = $this->user(['reminder_style' => 'nudge']);
         $log = $this->pendingLog($user, 'evening_short');
 
         SendAdhkarReminderJob::dispatchSync($log->id);

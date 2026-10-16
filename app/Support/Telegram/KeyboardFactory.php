@@ -266,6 +266,9 @@ class KeyboardFactory
         $followUpButton = $user->follow_up_enabled
             ? ['text' => '🔁 تذكير ثانٍ إن نسيت: مفعّل ✅', 'callback_data' => 'settings:follow_up']
             : ['text' => '🔁 تذكير ثانٍ إن نسيت: معطّل', 'callback_data' => 'settings:follow_up'];
+        $weeklyButton = $user->weekly_summary_enabled
+            ? ['text' => '📊 الملخص الأسبوعي: مفعّل ✅', 'callback_data' => 'settings:weekly']
+            : ['text' => '📊 الملخص الأسبوعي: معطّل', 'callback_data' => 'settings:weekly'];
 
         return [
             'inline_keyboard' => [
@@ -276,6 +279,7 @@ class KeyboardFactory
                 ]),
                 [$styleButton],
                 [$followUpButton],
+                [$weeklyButton],
                 [$reminderButton],
                 [['text' => __('bot.help_back'), 'callback_data' => 'nav:home']],
             ],
@@ -496,7 +500,7 @@ class KeyboardFactory
             'keyboard' => [
                 $this->rtl([['text' => '🌅 أذكار الصباح'], ['text' => '🌙 أذكار المساء']]),
                 $this->rtl([['text' => '☀️ أذكار الاستيقاظ'], ['text' => '🛌 أذكار النوم']]),
-                $this->rtl([['text' => '🕌 أذكار الصلاة'], ['text' => '🌟 أذكار إضافية']]),
+                $this->rtl([['text' => '🕌 أذكار بعد الصلاة'], ['text' => '🌟 أذكار إضافية']]),
                 $this->rtl([
                     ['text' => '⚙️ الإعدادات', 'style' => 'primary'],
                     ['text' => '❓ المساعدة والشرح', 'style' => 'primary'],

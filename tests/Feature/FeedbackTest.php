@@ -54,10 +54,12 @@ class FeedbackTest extends TestCase
         $this->assertSame(500, (int) $feedback->admin_header_message_id);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
             && (int) $request['chat_id'] === self::ADMIN
-            && str_contains((string) $request['text'], 'ملاحظة جديدة'));
+            && str_contains((string) $request['text'], 'ملاحظة جديدة')
+            && str_contains((string) $request['text'], 'الحساب: @nawar'));
         Http::assertNotSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === self::ADMIN
-            && (str_contains((string) ($request['text'] ?? ''), 'نوار')
-                || str_contains((string) ($request['text'] ?? ''), '1001')));
+            && str_contains((string) ($request['text'] ?? ''), '1001'));
+        Http::assertNotSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === 1001
+            && str_contains((string) ($request['text'] ?? ''), '@nawar'));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'copyMessage')
             && (int) $request['chat_id'] === self::ADMIN
             && (int) $request['from_chat_id'] === 1001
@@ -79,6 +81,31 @@ class FeedbackTest extends TestCase
         Http::assertSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === self::ADMIN
             && str_contains((string) ($request['text'] ?? ''), 'وصل ردّك'));
         $this->assertNotNull($feedback->fresh()->replied_at);
+    }
+
+    public function test_admin_header_uses_the_first_name_when_the_account_has_no_username(): void
+    {
+        User::factory()->create([
+            'telegram_id' => 1001,
+            'chat_id' => 1001,
+            'first_name' => 'سلمى',
+            'username' => null,
+        ]);
+
+        $open = $this->telegramMessagePayload('/feedback', 1);
+        unset($open['message']['from']['username']);
+        $open['message']['from']['first_name'] = 'سلمى';
+        $note = $this->telegramMessagePayload('ملاحظة', 2);
+        unset($note['message']['from']['username']);
+        $note['message']['from']['first_name'] = 'سلمى';
+
+        $this->handle($open);
+        $this->handle($note);
+
+        Http::assertSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === self::ADMIN
+            && str_contains((string) ($request['text'] ?? ''), 'الحساب: سلمى'));
+        Http::assertNotSent(fn ($request) => (int) ($request['chat_id'] ?? 0) === 1001
+            && str_contains((string) ($request['text'] ?? ''), 'سلمى'));
     }
 
     public function test_voice_feedback_is_copied_instead_of_the_cannot_hear_reply(): void

@@ -105,6 +105,9 @@ class UserSettingsService
         $user->awaiting_input = null;
         $user->reminders_enabled = true;
         $user->paused_at = null;
+        $user->reminder_style = 'direct';
+        $user->follow_up_enabled = true;
+        $user->weekly_summary_enabled = true;
         $this->recalculateNextReminders($user);
         $user->save();
 

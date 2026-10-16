@@ -109,7 +109,7 @@ class BedtimeWakingTest extends TestCase
         // Telegram draws the first button on the left, so the first choice of each row sits on the right.
         $this->assertSame(['🌙 أذكار المساء', '🌅 أذكار الصباح'], array_column($keyboard['keyboard'][0], 'text'));
         $this->assertSame(['🛌 أذكار النوم', '☀️ أذكار الاستيقاظ'], array_column($keyboard['keyboard'][1], 'text'));
-        $this->assertSame(['🌟 أذكار إضافية', '🕌 أذكار الصلاة'], array_column($keyboard['keyboard'][2], 'text'));
+        $this->assertSame(['🌟 أذكار إضافية', '🕌 أذكار بعد الصلاة'], array_column($keyboard['keyboard'][2], 'text'));
         $this->assertSame(['❓ المساعدة والشرح', '⚙️ الإعدادات'], array_column($keyboard['keyboard'][3], 'text'));
         $this->assertSame(['💬 أرسل ملاحظة أو اقتراحًا'], array_column($keyboard['keyboard'][4], 'text'));
         $this->assertCount(5, $keyboard['keyboard']);
@@ -176,7 +176,7 @@ class BedtimeWakingTest extends TestCase
     public function test_prayer_button_opens_the_after_prayer_card(): void
     {
         $this->user();
-        $this->message('🕌 أذكار الصلاة', 32);
+        $this->message('🕌 أذكار بعد الصلاة', 32);
 
         $request = $this->lastSent('sendMessage');
         $text = (string) $request['text'];

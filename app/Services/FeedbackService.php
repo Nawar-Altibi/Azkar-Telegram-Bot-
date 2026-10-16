@@ -116,7 +116,7 @@ class FeedbackService
         }
 
         try {
-            $header = $this->telegram->sendMessage($admin, $this->adminHeader($feedback));
+            $header = $this->telegram->sendMessage($admin, $this->adminHeader($user, $feedback));
             $headerId = data_get($header, 'result.message_id');
             $copy = $this->telegram->copyMessage($admin, $user->chat_id, (int) $feedback->message_id, $headerId !== null
                 ? ['reply_parameters' => json_encode(['message_id' => $headerId, 'allow_sending_without_reply' => true])]
@@ -132,9 +132,24 @@ class FeedbackService
         }
     }
 
-    private function adminHeader(Feedback $feedback): string
+    private function adminHeader(User $user, Feedback $feedback): string
     {
-        return __('bot.feedback_admin_header', ['id' => $feedback->id]);
+        return __('bot.feedback_admin_header', [
+            'id' => $feedback->id,
+            'account' => $this->accountLabel($user),
+        ]);
+    }
+
+    /**
+     * Shown only on the owner's copy of the note. The user never receives this label.
+     */
+    private function accountLabel(User $user): string
+    {
+        $label = filled($user->username)
+            ? '@'.$user->username
+            : (filled($user->first_name) ? $user->first_name : '—');
+
+        return e($label);
     }
 
     private function openKey(User $user): string

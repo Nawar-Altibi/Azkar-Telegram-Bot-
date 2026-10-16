@@ -43,11 +43,19 @@ class ReadingSessionRecorder
                     'started_at' => now(),
                     'furthest' => $reached,
                     'source' => $source,
+                    'card_times' => [(string) $reached => now()->toIso8601String()],
                 ]);
             } elseif ($opened) {
                 $session->furthest = $reached;
+                $session->card_times = [(string) $reached => now()->toIso8601String()];
             } else {
-                $session->furthest = max((int) $session->furthest, $reached);
+                $previous = (int) $session->furthest;
+                $session->furthest = max($previous, $reached);
+                if ($reached > $previous) {
+                    $times = is_array($session->card_times) ? $session->card_times : [];
+                    $times[(string) $reached] = now()->toIso8601String();
+                    $session->card_times = $times;
+                }
             }
 
             $session->collection_key = $collectionKey;

@@ -73,6 +73,9 @@ class OnboardingTest extends TestCase
         $this->assertSame('18:00:00', $user->evening_time);
         $this->assertSame(OnboardingState::Completed, $user->onboarding_state);
         $this->assertTrue($user->reminders_enabled);
+        $this->assertSame('direct', $user->reminder_style);
+        $this->assertTrue($user->follow_up_enabled);
+        $this->assertTrue($user->weekly_summary_enabled);
         $this->assertNotNull($user->next_morning_at);
         $this->assertNotNull($user->next_evening_at);
         Http::assertSent(function ($request) {

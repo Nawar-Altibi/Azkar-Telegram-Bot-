@@ -20,6 +20,7 @@ class ReadingSession extends Model
         'source',
         'total',
         'furthest',
+        'card_times',
         'local_hour',
         'local_weekday',
         'started_at',
@@ -30,6 +31,7 @@ class ReadingSession extends Model
     protected function casts(): array
     {
         return [
+            'card_times' => 'array',
             'started_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'completed_at' => 'datetime',

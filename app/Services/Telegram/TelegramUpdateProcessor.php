@@ -14,6 +14,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
 use App\Services\AdminReportService;
+use App\Services\AdminUserUsageService;
 use App\Services\BotEventRecorder;
 use App\Services\FeedbackService;
 use App\Services\OnboardingService;
@@ -51,6 +52,7 @@ class TelegramUpdateProcessor
         private readonly FeedbackService $feedback,
         private readonly ReadingSessionRecorder $readings,
         private readonly AdminReportService $reports,
+        private readonly AdminUserUsageService $userUsage,
         private readonly ReminderCompletionService $completion,
     ) {}
 
@@ -291,6 +293,14 @@ class TelegramUpdateProcessor
         if ($command === '/stats' && $this->feedback->isAdminChat($user->chat_id)) {
             $days = (int) (explode(' ', $text)[1] ?? 7);
             $this->reply($user, $this->reports->build(min(90, max(1, $days))));
+
+            return;
+        }
+
+        if ($command === '/user' && $this->feedback->isAdminChat($user->chat_id)) {
+            foreach ($this->userUsage->report(trim((string) (explode(' ', $text, 2)[1] ?? ''))) as $chunk) {
+                $this->reply($user, $chunk);
+            }
 
             return;
         }
@@ -649,6 +659,36 @@ class TelegramUpdateProcessor
         if ($data === 'feedback:start') {
             $this->safeAnswer($callbackId);
             $this->startFeedback($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'feedback:later') {
+            $this->safeAnswer($callbackId);
+            $user->feedback_nudge_at = now();
+            $user->save();
+            $this->show($user, __('bot.feedback_later'), null, $messageId);
+
+            return;
+        }
+
+        if ($data === 'time_fit:ok') {
+            $this->safeAnswer($callbackId);
+            $this->show($user, __('bot.time_fit_ok'), null, $messageId);
+
+            return;
+        }
+
+        if ($data === 'time_fit:change' || $data === 'comeback:change') {
+            $this->safeAnswer($callbackId);
+            $this->sendSettings($user, $messageId);
+
+            return;
+        }
+
+        if ($data === 'comeback:continue') {
+            $this->safeAnswer($callbackId);
+            $this->show($user, __('bot.comeback_continued'), null, $messageId);
 
             return;
         }
@@ -1065,6 +1105,15 @@ class TelegramUpdateProcessor
             $user->save();
             $this->events->record($user, 'follow_up_setting', ['enabled' => $user->follow_up_enabled]);
             $this->showSettingsSaved($user, __($user->follow_up_enabled ? 'bot.follow_up_on' : 'bot.follow_up_off'), $messageId);
+
+            return;
+        }
+
+        if ($data === 'settings:weekly') {
+            $user->weekly_summary_enabled = ! $user->weekly_summary_enabled;
+            $user->save();
+            $this->events->record($user, 'weekly_summary_setting', ['enabled' => $user->weekly_summary_enabled]);
+            $this->showSettingsSaved($user, __($user->weekly_summary_enabled ? 'bot.weekly_summary_on' : 'bot.weekly_summary_off'), $messageId);
 
             return;
         }

@@ -31,6 +31,7 @@ class ReminderDeliveryAndVersioningTest extends TestCase
             'telegram_id' => 2002,
             'chat_id' => 2002,
             'mode' => AdhkarMode::Short,
+            'reminder_style' => 'nudge',
         ]);
         $log = ReminderLog::factory()->create([
             'user_id' => $user->id,

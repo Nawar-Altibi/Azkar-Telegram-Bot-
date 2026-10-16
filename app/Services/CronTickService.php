@@ -39,6 +39,7 @@ class CronTickService
         private readonly ReminderDispatchService $dispatcher,
         private readonly StaleRecoveryService $recovery,
         private readonly FollowUpReminderService $followUps,
+        private readonly EngagementMessageService $engagement,
         private readonly GroupPostService $groupPosts,
         private readonly AdminReportService $reports,
     ) {}
@@ -60,6 +61,7 @@ class CronTickService
             'stale_reminders_recovered' => 0,
             'stale_updates_recovered' => 0,
             'follow_ups_sent' => 0,
+            'engagement_sent' => 0,
             'group_posts' => 0,
             'weekly_report' => false,
             'skipped_locked' => false,
@@ -108,6 +110,8 @@ class CronTickService
                     $metrics['stale_updates_recovered'] = $recovered['updates'];
                     // Rides on recovery's 5-minute cadence so idle ticks stay within their query budget.
                     $metrics['follow_ups_sent'] = $this->followUps->sendDue();
+                    $engagement = $this->engagement->sendDue($deadline);
+                    $metrics['engagement_sent'] = array_sum($engagement);
                 }
             }
 

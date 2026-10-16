@@ -14,6 +14,7 @@ class GroupChat extends Model
         'morning_time' => '06:00',
         'evening_time' => '17:00',
         'mode' => 'short',
+        'delivery_format' => 'images',
         'enabled' => false,
         'bot_member' => true,
     ];
@@ -25,6 +26,7 @@ class GroupChat extends Model
         'morning_time',
         'evening_time',
         'mode',
+        'delivery_format',
         'enabled',
         'bot_member',
         'next_morning_at',

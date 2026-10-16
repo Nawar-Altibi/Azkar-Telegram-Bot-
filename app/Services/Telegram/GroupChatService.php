@@ -339,6 +339,8 @@ class GroupChatService
             $group->evening_time = $value;
         } elseif ($action === 'mode') {
             $group->mode = $group->mode === AdhkarMode::Full ? AdhkarMode::Short : AdhkarMode::Full;
+        } elseif ($action === 'format') {
+            $group->delivery_format = ($group->delivery_format ?? 'images') === 'text' ? 'images' : 'text';
         } elseif ($action === 'toggle' && $group->timezone !== null) {
             $group->enabled = ! $group->enabled;
         } else {
@@ -379,6 +381,7 @@ class GroupChatService
             'morning' => ReminderScheduleCalculator::format12Hour($group->morning_time),
             'evening' => ReminderScheduleCalculator::format12Hour($group->evening_time),
             'mode' => $this->modeLabel($group),
+            'format' => $this->formatLabel($group),
         ]);
     }
 
@@ -394,6 +397,7 @@ class GroupChatService
                 ['text' => __('bot.group.evening_button'), 'callback_data' => 'g:et'],
             ]),
             [['text' => __('bot.group.mode_button', ['mode' => $this->modeLabel($group)]), 'callback_data' => 'g:mode']],
+            [['text' => __('bot.group.format_button', ['format' => $this->formatLabel($group)]), 'callback_data' => 'g:format']],
         ];
         if ($group->timezone !== null) {
             $rows[] = [['text' => $group->enabled ? __('bot.group.pause_button') : __('bot.group.resume_button'), 'callback_data' => 'g:toggle']];
@@ -489,6 +493,13 @@ class GroupChatService
     private function modeLabel(GroupChat $group): string
     {
         return $group->mode === AdhkarMode::Full ? __('bot.mode_full') : __('bot.mode_short');
+    }
+
+    private function formatLabel(GroupChat $group): string
+    {
+        return ($group->delivery_format ?? 'images') === 'text'
+            ? __('bot.group.format_text')
+            : __('bot.group.format_images');
     }
 
     private function group(int $chatId, ?string $title): GroupChat
