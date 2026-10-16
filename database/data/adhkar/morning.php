@@ -270,7 +270,7 @@ return [
         'guidance_note' => null,
         'notes' => 'مختلف في الرفع والوقف.',
         'order' => 14,
-        'collections' => ['morning_full'],
+        'collections' => ['morning_short', 'morning_full'],
     ],
     [
         'key' => 'morning.14',

@@ -273,7 +273,7 @@ return [
         'guidance_note' => null,
         'notes' => 'مختلف في الرفع والوقف.',
         'order' => 14,
-        'collections' => ['evening_full'],
+        'collections' => ['evening_short', 'evening_full'],
     ],
     [
         'key' => 'evening.14',

@@ -46,9 +46,9 @@ class BedtimeWakingTest extends TestCase
 
     public function test_existing_collections_are_unchanged_and_resync_is_idempotent(): void
     {
-        $this->assertSame(9, count($this->keys('morning_short')));
+        $this->assertSame(10, count($this->keys('morning_short')));
         $this->assertSame(20, count($this->keys('morning_full')));
-        $this->assertSame(9, count($this->keys('evening_short')));
+        $this->assertSame(10, count($this->keys('evening_short')));
         $this->assertSame(19, count($this->keys('evening_full')));
         $this->assertSame(10, count($this->keys('additional')));
 
