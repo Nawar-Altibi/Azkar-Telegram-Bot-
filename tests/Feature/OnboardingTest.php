@@ -359,6 +359,7 @@ class OnboardingTest extends TestCase
                 && str_contains($markup, 'help:topic:missing')
                 && ! str_contains($markup, 'help:topic:night')
                 && str_contains($markup, 'help:topic:style')
+                && str_contains($markup, 'help:topic:weekly')
                 && str_contains($markup, 'help:topic:groups')
                 && ! str_contains((string) ($request['text'] ?? ''), '/start');
         });
@@ -366,6 +367,10 @@ class OnboardingTest extends TestCase
         $this->process($this->telegramCallbackPayload('help:topic:style', 6));
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الأذكار مباشرة')
             && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:style'));
+
+        $this->process($this->telegramCallbackPayload('help:topic:weekly', 8));
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'الملخص الأسبوعي')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'settings:open'));
 
         $this->process($this->telegramCallbackPayload('help:topic:groups', 7));
         Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ضبط الأوقات'));

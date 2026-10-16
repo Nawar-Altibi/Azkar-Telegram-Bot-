@@ -57,7 +57,7 @@ class KeyboardFactory
             $action = match ($key) {
                 'read' => ['text' => '📖 أذكار اليوم', 'callback_data' => 'today:menu'],
                 'style' => ['text' => '🔔 اختر شكل التذكير', 'callback_data' => 'settings:style'],
-                'time', 'stop', 'missing' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
+                'time', 'stop', 'missing', 'weekly' => ['text' => '⚙️ افتح الإعدادات', 'callback_data' => 'settings:open'],
                 default => null,
             };
             if ($action !== null) {

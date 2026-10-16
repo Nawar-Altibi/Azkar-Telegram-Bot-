@@ -44,7 +44,7 @@ Rows: region, morning time, evening time, reminder style, follow-up, pause or re
 
 ## Help
 
-`❓ المساعدة والشرح` opens one button per question: the idea of the bot, how to read, reminder styles and the follow-up, changing the time, stopping reminders, short vs full, bedtime, waking, prayer and additional adhkar, enlarging the font, adding the bot to a group, and missing reminders. Each answer has a button that leads to the related screen, and «🔙 باقي الأسئلة».
+`❓ المساعدة والشرح` opens one button per question: the idea of the bot, how to read, reminder styles and the follow-up, the weekly summary, changing the time, stopping reminders, short vs full, bedtime, waking, prayer and additional adhkar, enlarging the font, adding the bot to a group, and missing reminders. Each answer has a button that leads to the related screen, and «🔙 باقي الأسئلة».
 
 ## Feedback
 
@@ -121,4 +121,4 @@ Newer events: `additional_item` (which additional dhikr was opened), `wird_saved
 
 ## Not in this version
 
-Simple mode and family links, AI understanding, a weekly summary, a counter, audio, and prayer-linked times. The reading cursor lives in the inline button, so closing the chat does not reopen the same card.
+Simple mode and family links, AI understanding, a counter, audio, and prayer-linked times. The reading cursor lives in the inline button, so closing the chat does not reopen the same card.
