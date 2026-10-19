@@ -14,7 +14,6 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         Http::preventStrayRequests();
-        config(['adhkar.inter_message_delay_microseconds' => 0]);
     }
 
     /**

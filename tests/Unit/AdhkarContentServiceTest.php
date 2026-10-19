@@ -2,43 +2,32 @@
 
 namespace Tests\Unit;
 
-use App\Enums\AdhkarCategory;
-use App\Models\AdhkarCollection;
 use App\Models\AdhkarItem;
 use App\Services\AdhkarContentService;
 use Tests\TestCase;
 
 class AdhkarContentServiceTest extends TestCase
 {
-    public function test_it_chunks_messages_under_the_limit_and_snapshots_versions(): void
+    public function test_text_wird_is_split_under_the_message_limit_and_snapshots_versions(): void
     {
-        $collection = AdhkarCollection::query()->create([
-            'key' => 'morning_short',
-            'category' => AdhkarCategory::Morning,
-            'variant' => 'short',
-            'title' => 'أذكار الصباح',
-            'active' => true,
-            'order' => 1,
-        ]);
-
         $items = [];
         for ($i = 1; $i <= 3; $i++) {
-            $item = AdhkarItem::factory()->create([
+            $items[] = AdhkarItem::factory()->create([
                 'key' => "morning.chunk.{$i}",
                 'title' => "ذكر {$i}",
-                'arabic_text' => str_repeat('نص ', 20).$i,
+                'arabic_text' => str_repeat('نص ', 500).$i,
                 'content_version' => $i,
                 'order' => $i,
             ]);
-            $items[] = $item;
-            $collection->items()->attach($item->id, ['order' => $i]);
         }
 
-        config(['adhkar.message_limit' => 120]);
         $service = app(AdhkarContentService::class);
-        $messages = $service->buildMessages($collection->fresh());
+        $messages = $service->offlineMessages('morning_short', collect($items));
 
         $this->assertGreaterThan(1, count($messages));
+        foreach ($messages as $message) {
+            $this->assertLessThanOrEqual(4096, mb_strlen($message));
+        }
         foreach ($items as $item) {
             $hits = 0;
             foreach ($messages as $message) {
@@ -48,8 +37,8 @@ class AdhkarContentServiceTest extends TestCase
             }
             $this->assertSame(1, $hits);
         }
-        $this->assertStringContainsString('من 3', $messages[0]);
-        $this->assertStringNotContainsString('دقائق', $messages[0]);
+        $this->assertStringContainsString('الذكر 1 من 3', $messages[0]);
+        $this->assertStringContainsString('الذكر 3 من 3', end($messages));
 
         $snapshot = $service->snapshotVersions($items);
         $this->assertCount(3, $snapshot['content_version_map']);

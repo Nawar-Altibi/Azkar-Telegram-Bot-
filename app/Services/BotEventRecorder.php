@@ -54,11 +54,6 @@ class BotEventRecorder
             ->delete();
     }
 
-    public function hasRecorded(User $user, string $event): bool
-    {
-        return BotEvent::query()->where('user_id', $user->id)->where('event', $event)->exists();
-    }
-
     /**
      * Seconds since this user's last pause, or null when there was none.
      */

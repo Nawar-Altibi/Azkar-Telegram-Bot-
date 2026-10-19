@@ -7,7 +7,6 @@ use App\Enums\AdhkarMode;
 use App\Enums\ReminderType;
 use App\Models\AdhkarCollection;
 use App\Models\AdhkarItem;
-use App\Models\User;
 use Illuminate\Support\Collection;
 
 class AdhkarContentService
@@ -16,14 +15,6 @@ class AdhkarContentService
      * Manual collections read in one version only, keyed by their period code in rt:/sv:t: callbacks.
      */
     private const SINGLE_COLLECTIONS = ['b' => 'bedtime', 'w' => 'waking', 'p' => 'after_prayer', 'z' => 'additional'];
-
-    public function resolveCollection(User $user, ReminderType $type): ?AdhkarCollection
-    {
-        return AdhkarCollection::query()
-            ->where('key', $this->collectionKey($user->mode ?? AdhkarMode::Short, $type))
-            ->where('active', true)
-            ->first();
-    }
 
     public function collectionKey(AdhkarMode $mode, ReminderType $type): string
     {
@@ -72,69 +63,6 @@ class AdhkarContentService
             $collectionKey === 'additional' => 'أذكار إضافية',
             default => 'الأذكار',
         };
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    public function buildMessages(AdhkarCollection $collection, bool $includeFooter = true): array
-    {
-        $items = $collection->items()->where('adhkar_items.active', true)->get()->values();
-        $total = $items->count();
-        if ($total === 0) {
-            return [$collection->title];
-        }
-
-        $perMessage = max(1, (int) config('adhkar.items_per_message', 4));
-        $limit = (int) config('adhkar.message_limit', 3900);
-        $blocks = [];
-        foreach ($items as $index => $item) {
-            $blocks[] = $this->formatItem($item, $index + 1);
-        }
-
-        $groups = [];
-        $current = [];
-        $placed = 0;
-        foreach ($blocks as $block) {
-            $candidate = array_merge($current, [$block]);
-            $start = $placed + 1;
-            $end = $placed + count($candidate);
-            $preview = $this->renderChunk($collection, $candidate, $start, $end, $total, $groups === [], false);
-            $tooMany = count($candidate) > $perMessage;
-            $tooLong = mb_strlen($preview) > $limit;
-
-            if ($current !== [] && ($tooMany || $tooLong)) {
-                $groups[] = $current;
-                $placed += count($current);
-                $current = [$block];
-            } else {
-                $current = $candidate;
-            }
-        }
-
-        if ($current !== []) {
-            $groups[] = $current;
-        }
-
-        $messages = [];
-        $cursor = 1;
-        $last = array_key_last($groups);
-        foreach ($groups as $index => $group) {
-            $start = $cursor;
-            $end = $cursor + count($group) - 1;
-            $cursor = $end + 1;
-            $messages[] = $this->renderChunk(
-                $collection,
-                $group,
-                $start,
-                $end,
-                $total,
-                $index === 0,
-                $includeFooter && $index === $last,
-            );
-        }
-
-        return $messages;
     }
 
     public function nudgeText(string $collectionKey): string
@@ -355,38 +283,6 @@ class AdhkarContentService
             'content_version_map' => $canonical,
             'content_snapshot_hash' => hash('sha256', $encoded),
         ];
-    }
-
-    /**
-     * @param  array<int, string>  $blocks
-     */
-    private function renderChunk(
-        AdhkarCollection $collection,
-        array $blocks,
-        int $start,
-        int $end,
-        int $total,
-        bool $withHeader,
-        bool $withFooter,
-    ): string {
-        $lines = [];
-        if ($withHeader) {
-            $lines[] = $this->sessionHeader((string) $collection->key);
-            $lines[] = '';
-        }
-
-        $lines[] = $start === $end
-            ? "الذكر {$start} من {$total}"
-            : "الذكر {$start}–{$end} من {$total}";
-        $lines[] = '';
-        $lines[] = implode("\n\n", $blocks);
-
-        if ($withFooter) {
-            $lines[] = '';
-            $lines[] = $this->footerForKey((string) $collection->key);
-        }
-
-        return trim(implode("\n", $lines));
     }
 
     /**

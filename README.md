@@ -58,7 +58,7 @@ docker compose exec web php artisan telegram:webhook:set
 
 ## Content
 
-Editorial sources: `resources/adhkar/*.md` (copied from `app adhkar/`). Structured seed: `database/data/adhkar/*.php`. Sync with `php artisan adhkar:sync`. Do not invent virtues, counts, or timings.
+Editorial sources: `resources/adhkar/*.md`. Research and the Hisn al-Muslim PDF behind them: `docs/sources/`. Structured seed: `database/data/adhkar/*.php`. Sync with `php artisan adhkar:sync`. Do not invent virtues, counts, or timings.
 
 ## Tests
 

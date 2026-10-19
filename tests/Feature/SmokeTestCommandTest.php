@@ -41,4 +41,9 @@ class SmokeTestCommandTest extends TestCase
     {
         $this->get('/up')->assertOk();
     }
+
+    public function test_home_page_answers_without_frontend_assets(): void
+    {
+        $this->get('/')->assertOk()->assertSee('Azkar Bot is running.');
+    }
 }

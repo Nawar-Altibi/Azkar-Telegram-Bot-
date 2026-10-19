@@ -78,11 +78,6 @@ class UserSettingsService
         return 'resumed';
     }
 
-    public function toggleReminders(User $user): string
-    {
-        return $user->reminders_enabled ? $this->pause($user) : $this->resume($user);
-    }
-
     public function recalculateNextReminders(User $user): void
     {
         if (! $user->timezone || ! $user->morning_time || ! $user->evening_time) {

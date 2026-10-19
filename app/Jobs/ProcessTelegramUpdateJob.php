@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Enums\ReminderLogStatus;
 use App\Enums\TelegramUpdateStatus;
 use App\Models\TelegramUpdate;
 use App\Services\Telegram\TelegramUpdateProcessor;

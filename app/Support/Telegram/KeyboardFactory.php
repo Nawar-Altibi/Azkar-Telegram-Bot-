@@ -433,18 +433,6 @@ class KeyboardFactory
     /**
      * @return array<string, mixed>
      */
-    public function completion(int $reminderLogId): array
-    {
-        return [
-            'inline_keyboard' => [[
-                ['text' => '✅ تم', 'callback_data' => 'reminder:done:'.$reminderLogId],
-            ]],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     public function followUp(int $reminderLogId, ?string $phase): array
     {
         $start = 'reminder:start:'.$reminderLogId.($phase !== null ? ':'.$phase : '');

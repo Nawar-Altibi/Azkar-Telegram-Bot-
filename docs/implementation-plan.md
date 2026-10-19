@@ -12,7 +12,7 @@ This file is the index for the documentation package.
 
 ## Product
 
-Arabic-first Telegram bot that helps a user keep a calm daily habit of authentic morning and evening adhkar, with an optional additional section. Religious content is transcribed from `resources/adhkar/*.md` (copied from `app adhkar/`) into structured seed files and synced with `php artisan adhkar:sync`. Wording, repetitions, virtues, and sources are not rewritten.
+Arabic-first Telegram bot that helps a user keep a calm daily habit of authentic morning and evening adhkar, with an optional additional section. Religious content is transcribed from `resources/adhkar/*.md` into structured seed files and synced with `php artisan adhkar:sync`. Wording, repetitions, virtues, and sources are not rewritten.
 
 ## Runtime shape
 

@@ -1,9 +1,6 @@
 <?php
 
 return [
-    'message_limit' => 3900,
-    // Kept for the unused chunk helper. Delivery sends one adhkar per card.
-    'items_per_message' => 4,
     /*
      * Minutes before a pending reminder is treated as stale.
      * This window must exceed the Telegram HTTP timeout (config telegram.timeout, seconds),
@@ -22,7 +19,6 @@ return [
      */
     'cron_claim_budget_seconds' => (int) env('ADHKAR_CRON_CLAIM_BUDGET_SECONDS', 25),
     'cron_count_queries' => (bool) env('ADHKAR_CRON_COUNT_QUERIES', true),
-    'inter_message_delay_microseconds' => 50_000,
 
     // Wird pages are sent as photos when pdftoppm (poppler-utils) is installed, and as a PDF otherwise.
     'pdftoppm_binary' => env('ADHKAR_PDFTOPPM_BINARY', 'pdftoppm'),

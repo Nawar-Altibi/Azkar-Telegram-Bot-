@@ -710,12 +710,6 @@ class TelegramUpdateProcessor
             return;
         }
 
-        if ($data === 'noop') {
-            $this->safeAnswer($callbackId);
-
-            return;
-        }
-
         if ($data === 'nav:back') {
             $this->safeAnswer($callbackId);
             $this->sendResponse($user, $this->onboarding->back($user->fresh()), $messageId);
