@@ -21,12 +21,13 @@ class WirdSender
     ) {}
 
     /**
-     * Sends the wird pages as photos that open inside Telegram, optionally with a button for the printable PDF.
+     * Sends the wird pages as photos that open inside Telegram, then an optional follow-up (print button, or the private text switch).
      *
      * @param  Collection<int, AdhkarItem>  $items
+     * @param  array<string, mixed>|null  $followUpMarkup
      * @return bool false when page images cannot be made here, so the caller sends the PDF
      */
-    public function sendImages(int $chatId, string $collectionKey, Collection $items, bool $fullOnly, ?string $printCallback, ?string $caption = null): bool
+    public function sendImages(int $chatId, string $collectionKey, Collection $items, bool $fullOnly, ?string $printCallback, ?string $caption = null, ?array $followUpMarkup = null, ?string $followUpText = null): bool
     {
         // Container disks are wiped on restart while the file ids live in the shared cache,
         // so pages are rendered only when Telegram has no copy of this exact content.
@@ -92,7 +93,11 @@ class WirdSender
         }
 
         if ($printCallback !== null) {
-            $this->telegram->sendMessage($chatId, __('bot.pdf_print_hint'), $this->keyboards->printPdf($printCallback));
+            $this->telegram->sendMessage(
+                $chatId,
+                $followUpText ?? __('bot.pdf_print_hint'),
+                $followUpMarkup ?? $this->keyboards->printPdf($printCallback),
+            );
         }
 
         return true;

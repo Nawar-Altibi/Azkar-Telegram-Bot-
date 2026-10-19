@@ -252,6 +252,35 @@ class KeyboardFactory
     }
 
     /**
+     * Shown under a private image album: print, and the switch into remembered text delivery.
+     *
+     * @return array<string, mixed>
+     */
+    public function wirdImagesFollowUp(string $printCallback, string $textCallback): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => __('bot.pdf_print_button'), 'callback_data' => $printCallback]],
+                [['text' => __('bot.delivery_text_button'), 'callback_data' => $textCallback]],
+            ],
+        ];
+    }
+
+    /**
+     * Shown on the last message of a private text wird, to switch back to images.
+     *
+     * @return array<string, mixed>
+     */
+    public function wirdTextSwitch(string $imagesCallback): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => __('bot.delivery_images_button'), 'callback_data' => $imagesCallback]],
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function settingsMenu(User $user): array

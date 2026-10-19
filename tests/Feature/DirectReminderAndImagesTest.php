@@ -110,7 +110,10 @@ class DirectReminderAndImagesTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMediaGroup'));
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendDocument'));
         Http::assertSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'sp:t:m:s')
-            && str_contains((string) ($request['reply_markup'] ?? ''), 'نسخة PDF للطباعة'));
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'نسخة PDF للطباعة')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'sx:text:t:m:s')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'أرسله رسائل بدل الصور')
+            && str_contains((string) ($request['text'] ?? ''), 'إذا أحببت الورد رسائل'));
 
         $this->press('sp:t:m:s', 6);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument'));
@@ -144,12 +147,78 @@ class DirectReminderAndImagesTest extends TestCase
     {
         config(['adhkar.pdftoppm_binary' => 'pdftoppm']);
         Process::fake(fn () => Process::result(exitCode: 127));
-        $this->user();
+        $user = $this->user();
 
         $this->press('sv:t:e:s', 7);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument'));
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendMediaGroup'));
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'sx:'));
+        $this->assertSame('images', $user->fresh()->delivery_format);
+        $this->assertFalse($user->fresh()->delivery_hint_seen);
+    }
+
+    public function test_text_delivery_is_remembered_and_switches_back_to_images(): void
+    {
+        config(['adhkar.pdftoppm_binary' => 'pdftoppm']);
+        Process::fake(function (PendingProcess $process) {
+            $prefix = (string) end($process->command);
+            foreach ([1, 2, 3] as $page) {
+                File::put($prefix.'-'.$page.'.png', 'png'.$page);
+            }
+
+            return Process::result();
+        });
+        $user = $this->user();
+
+        $this->press('sv:t:m:s', 20);
+        $this->assertSame('images', $user->fresh()->delivery_format);
+        $this->assertTrue($user->fresh()->delivery_hint_seen);
+
+        $this->press('sx:text:t:m:s', 21);
+        $this->assertSame('text', $user->fresh()->delivery_format);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
+            && str_contains((string) ($request['text'] ?? ''), 'الذكر')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'sx:images:t:m:s')
+            && str_contains((string) ($request['reply_markup'] ?? ''), 'أرسله صورًا بدل الرسائل'));
+        Http::assertNotSent(fn ($request) => (string) ($request['text'] ?? '') === __('bot.pdf_failed'));
+
+        $this->press('sv:t:m:s', 22);
+        $this->assertSame('text', $user->fresh()->delivery_format);
+        $this->assertSame(1, Http::recorded(fn ($request) => str_contains($request->url(), 'sendMediaGroup'))->count());
+
+        $this->press('sx:images:t:m:s', 23);
+        $this->assertSame('images', $user->fresh()->delivery_format);
+        $this->assertSame(2, Http::recorded(fn ($request) => str_contains($request->url(), 'sendMediaGroup'))->count());
+        $followUps = Http::recorded(fn ($request) => str_contains((string) ($request['reply_markup'] ?? ''), 'sx:text:t:m:s'));
+        $last = (string) ($followUps->last()[0]['text'] ?? '');
+        $this->assertStringNotContainsString('إذا أحببت الورد رسائل', $last);
+        $this->assertStringContainsString(__('bot.pdf_print_hint'), $last);
+    }
+
+    public function test_a_failed_text_delivery_is_not_sent_again_as_a_file_fallback(): void
+    {
+        Http::swap(new HttpFactory(app('events')));
+        Http::fake(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هذا الورد كاملًا')
+            ? Http::response(['ok' => false, 'error_code' => 400, 'description' => 'Bad Request'], 400)
+            : Http::response(['ok' => true, 'result' => ['message_id' => 5]]));
+        $user = $this->user(['delivery_format' => 'text']);
+
+        $this->press('sv:t:m:s', 40);
+
+        Http::assertNotSent(fn ($request) => (string) ($request['text'] ?? '') === __('bot.pdf_failed'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sendDocument'));
+        Http::assertSent(fn ($request) => (string) ($request['text'] ?? '') === __('bot.reading_failed'));
+        $this->assertSame('text', $user->fresh()->delivery_format);
+    }
+
+    public function test_an_unknown_delivery_switch_is_an_old_button(): void
+    {
+        $this->user();
+
+        $this->press('sx:nope:t:m:s', 30);
+
+        Http::assertSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'هذا الزر قديم'));
     }
 
     public function test_a_wiped_disk_reuses_telegram_copies_instead_of_rendering_again(): void

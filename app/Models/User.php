@@ -20,6 +20,8 @@ class User extends Model
         'reminder_style' => 'direct',
         'follow_up_enabled' => true,
         'weekly_summary_enabled' => true,
+        'delivery_format' => 'images',
+        'delivery_hint_seen' => false,
     ];
 
     protected $fillable = [
@@ -43,6 +45,8 @@ class User extends Model
         'time_fit_asked_at',
         'comeback_sent_at',
         'feedback_nudge_at',
+        'delivery_format',
+        'delivery_hint_seen',
         'onboarding_state',
         'awaiting_input',
         'next_morning_at',
@@ -71,6 +75,7 @@ class User extends Model
             'time_fit_asked_at' => 'datetime',
             'comeback_sent_at' => 'datetime',
             'feedback_nudge_at' => 'datetime',
+            'delivery_hint_seen' => 'boolean',
         ];
     }
 
@@ -96,6 +101,11 @@ class User extends Model
     public function sendsReadingWithReminder(): bool
     {
         return $this->reminder_style === 'direct';
+    }
+
+    public function prefersTextDelivery(): bool
+    {
+        return $this->delivery_format === 'text';
     }
 
     /**

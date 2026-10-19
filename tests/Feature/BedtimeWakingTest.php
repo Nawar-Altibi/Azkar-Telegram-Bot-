@@ -268,7 +268,7 @@ class BedtimeWakingTest extends TestCase
 
     public function test_full_ward_text_fallback_keeps_the_right_title(): void
     {
-        $this->user();
+        $user = $this->user();
         $this->app->instance(AdhkarPdfService::class, new class(app(AdhkarContentService::class)) extends AdhkarPdfService
         {
             public function build(string $collectionKey, Collection $items, bool $fullOnly = false, bool $print = false): array
@@ -285,6 +285,8 @@ class BedtimeWakingTest extends TestCase
             ->values();
         $this->assertSame(__('bot.pdf_failed'), $texts[0]);
         $this->assertStringStartsWith('☀️ أذكار الاستيقاظ', $texts[1]);
+        $this->assertSame('images', $user->fresh()->delivery_format);
+        Http::assertNotSent(fn ($r) => str_contains((string) ($r['reply_markup'] ?? ''), 'sx:'));
         $this->assertStringContainsString('الذكر 3 من 3', $texts[1]);
         $this->assertStringNotContainsString('أذكار الصباح', $texts->implode("\n"));
     }

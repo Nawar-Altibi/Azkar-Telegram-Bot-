@@ -375,7 +375,9 @@ class AdminReportService
         $saved = BotEvent::query()->where('event', 'wird_saved')->where('created_at', '>=', $since)->get(['meta']);
         if ($saved->isNotEmpty()) {
             $lines[] = $this->row('📥 مرات طلب الورد كاملًا', $saved->count())
-                .' (صور '.$saved->where('meta.format', 'images')->count().' · PDF '.$saved->where('meta.format', 'pdf')->count().')';
+                .' (صور '.$saved->where('meta.format', 'images')->count()
+                .' · رسائل '.$saved->where('meta.format', 'text')->count()
+                .' · PDF '.$saved->where('meta.format', 'pdf')->count().')';
         }
 
         $unclear = $this->eventCount(BotEventRecorder::UNKNOWN_TEXT, $since);

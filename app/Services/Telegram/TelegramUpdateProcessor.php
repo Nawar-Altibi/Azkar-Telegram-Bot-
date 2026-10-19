@@ -902,7 +902,7 @@ class TelegramUpdateProcessor
             return;
         }
 
-        if (str_starts_with($data, 'sv:') || str_starts_with($data, 'sp:')) {
+        if (str_starts_with($data, 'sv:') || str_starts_with($data, 'sp:') || str_starts_with($data, 'sx:')) {
             $this->handleOfflineSave($user, $data, $callbackId);
 
             return;
@@ -1721,47 +1721,15 @@ class TelegramUpdateProcessor
 
     private function handleOfflineSave(User $user, string $data, string $callbackId): void
     {
-        $parts = explode(':', $data);
-        $kind = $parts[1] ?? '';
-        $session = null;
-
-        if ($kind === 'l') {
-            $log = ReminderLog::query()
-                ->where('id', (int) ($parts[2] ?? 0))
-                ->where('user_id', $user->id)
-                ->first();
-            $phase = $parts[3] ?? '';
-            if ($log === null || ! in_array($phase, ['s', 'f', 'a'], true)) {
-                $this->safeAnswer($callbackId, __('bot.reminder_not_found'));
-
-                return;
-            }
-            if ($log->reading_started_at === null) {
-                $this->safeAnswer($callbackId, __('bot.start_reading_first'));
-
-                return;
-            }
-            $session = [
-                'baseKey' => (string) $log->collection_key,
-                'phase' => $phase,
-            ];
-        } elseif ($kind === 't') {
-            $phase = $parts[3] ?? '';
-            $baseKey = $this->content->manualBaseKey($parts[2] ?? '', $phase);
-            if ($baseKey === null) {
-                $this->replyOldButton($user, $callbackId);
-
-                return;
-            }
-            $session = [
-                'baseKey' => $baseKey,
-                'phase' => $phase,
-            ];
-        }
-
-        if ($session === null) {
+        $request = $this->offlineSaveRequest($data);
+        if ($request === null) {
             $this->replyOldButton($user, $callbackId);
 
+            return;
+        }
+
+        $session = $this->offlineSaveSession($user, $request['tail'], $callbackId);
+        if ($session === null) {
             return;
         }
 
@@ -1772,21 +1740,143 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if ($request['choice'] !== null) {
+            $user->delivery_format = $request['choice'];
+            $user->delivery_hint_seen = true;
+            if ($user->isDirty()) {
+                $user->save();
+            }
+        }
+
         $headerKey = $session['phase'] === 's'
             ? $session['baseKey']
             : $this->content->fullKey($session['baseKey']);
+        $format = $request['pdf'] ? 'pdf' : ($user->prefersTextDelivery() ? 'text' : 'images');
         $this->safeAnswer($callbackId);
         $fullOnly = $session['phase'] === 'f';
         $this->events->record($user, 'wird_saved', [
             'collection' => $headerKey,
-            'format' => str_starts_with($data, 'sv:') ? 'images' : 'pdf',
+            'format' => $format,
         ]);
 
-        try {
-            if (str_starts_with($data, 'sv:')
-                && $this->wirds->sendImages($user->chat_id, $headerKey, $items, $fullOnly, 'sp:'.substr($data, 3))) {
-                return;
+        $this->deliverOfflineWird($user, $headerKey, $items, $fullOnly, $request['tail'], $format);
+    }
+
+    /**
+     * `sv:` uses the remembered format. `sp:` prints a PDF. `sx:text:` and `sx:images:` send that format and remember it.
+     *
+     * @return array{tail:string,choice:?string,pdf:bool}|null
+     */
+    private function offlineSaveRequest(string $data): ?array
+    {
+        if (str_starts_with($data, 'sv:')) {
+            return ['tail' => substr($data, 3), 'choice' => null, 'pdf' => false];
+        }
+        if (str_starts_with($data, 'sp:')) {
+            return ['tail' => substr($data, 3), 'choice' => null, 'pdf' => true];
+        }
+        foreach (['text', 'images'] as $choice) {
+            $prefix = 'sx:'.$choice.':';
+            if (str_starts_with($data, $prefix)) {
+                return ['tail' => substr($data, strlen($prefix)), 'choice' => $choice, 'pdf' => false];
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{baseKey:string,phase:string}|null
+     */
+    private function offlineSaveSession(User $user, string $tail, string $callbackId): ?array
+    {
+        $parts = explode(':', $tail);
+        $kind = $parts[0] ?? '';
+
+        if ($kind === 'l') {
+            $log = ReminderLog::query()
+                ->where('id', (int) ($parts[1] ?? 0))
+                ->where('user_id', $user->id)
+                ->first();
+            $phase = $parts[2] ?? '';
+            if ($log === null || ! in_array($phase, ['s', 'f', 'a'], true)) {
+                $this->safeAnswer($callbackId, __('bot.reminder_not_found'));
+
+                return null;
+            }
+            if ($log->reading_started_at === null) {
+                $this->safeAnswer($callbackId, __('bot.start_reading_first'));
+
+                return null;
+            }
+
+            return [
+                'baseKey' => (string) $log->collection_key,
+                'phase' => $phase,
+            ];
+        }
+
+        if ($kind === 't') {
+            $phase = $parts[2] ?? '';
+            $baseKey = $this->content->manualBaseKey($parts[1] ?? '', $phase);
+            if ($baseKey === null) {
+                $this->replyOldButton($user, $callbackId);
+
+                return null;
+            }
+
+            return [
+                'baseKey' => $baseKey,
+                'phase' => $phase,
+            ];
+        }
+
+        $this->replyOldButton($user, $callbackId);
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, AdhkarItem>  $items
+     */
+    private function deliverOfflineWird(User $user, string $headerKey, Collection $items, bool $fullOnly, string $tail, string $format): void
+    {
+        if ($format === 'text') {
+            try {
+                $this->sendWirdText($user->chat_id, $headerKey, $items, 'sx:images:'.$tail);
+            } catch (Throwable $exception) {
+                Log::channel('telegram')->error('Offline reading delivery failed', [
+                    'user_id' => $user->id,
+                    'error' => TelegramClient::redact($exception->getMessage()),
+                ]);
+                $this->reply($user, __('bot.reading_failed'), $this->keyboards->todayShortcut());
+            }
+
+            return;
+        }
+
+        try {
+            if ($format === 'images') {
+                $showHint = ! $user->delivery_hint_seen;
+                $sent = $this->wirds->sendImages(
+                    $user->chat_id,
+                    $headerKey,
+                    $items,
+                    $fullOnly,
+                    'sp:'.$tail,
+                    followUpText: ($showHint ? __('bot.delivery_text_hint')."\n\n" : '').__('bot.pdf_print_hint'),
+                    followUpMarkup: $this->keyboards->wirdImagesFollowUp('sp:'.$tail, 'sx:text:'.$tail),
+                );
+                if ($sent) {
+                    if ($showHint) {
+                        $user->delivery_hint_seen = true;
+                        $user->save();
+                    }
+
+                    return;
+                }
+            }
+
             $this->wirds->sendPdf($user->chat_id, $headerKey, $items, $fullOnly);
 
             return;
@@ -1808,6 +1898,22 @@ class TelegramUpdateProcessor
                 'error' => TelegramClient::redact($exception->getMessage()),
             ]);
             $this->reply($user, __('bot.reading_failed'), $this->keyboards->todayShortcut());
+        }
+    }
+
+    /**
+     * @param  Collection<int, AdhkarItem>  $items
+     */
+    private function sendWirdText(int $chatId, string $headerKey, Collection $items, string $imagesCallback): void
+    {
+        $messages = $this->content->offlineMessages($headerKey, $items);
+        $last = array_key_last($messages);
+        foreach ($messages as $index => $message) {
+            $this->telegram->sendMessage(
+                $chatId,
+                $message,
+                $index === $last ? $this->keyboards->wirdTextSwitch($imagesCallback) : [],
+            );
         }
     }
 
