@@ -256,13 +256,18 @@ class KeyboardFactory
      *
      * @return array<string, mixed>
      */
-    public function wirdImagesFollowUp(string $printCallback, string $textCallback): array
+    public function wirdImagesFollowUp(string $printCallback, string $textCallback, ?string $doneCallback = null): array
     {
+        $rows = [
+            [['text' => __('bot.pdf_print_button'), 'callback_data' => $printCallback]],
+            [['text' => __('bot.delivery_text_button'), 'callback_data' => $textCallback]],
+        ];
+        if ($doneCallback !== null) {
+            $rows[] = [['text' => '✅ تم', 'callback_data' => $doneCallback]];
+        }
+
         return [
-            'inline_keyboard' => [
-                [['text' => __('bot.pdf_print_button'), 'callback_data' => $printCallback]],
-                [['text' => __('bot.delivery_text_button'), 'callback_data' => $textCallback]],
-            ],
+            'inline_keyboard' => $rows,
         ];
     }
 
@@ -271,11 +276,30 @@ class KeyboardFactory
      *
      * @return array<string, mixed>
      */
-    public function wirdTextSwitch(string $imagesCallback): array
+    public function wirdTextSwitch(string $imagesCallback, ?string $doneCallback = null): array
+    {
+        $rows = [
+            [['text' => __('bot.delivery_images_button'), 'callback_data' => $imagesCallback]],
+        ];
+        if ($doneCallback !== null) {
+            $rows[] = [['text' => '✅ تم', 'callback_data' => $doneCallback]];
+        }
+
+        return [
+            'inline_keyboard' => $rows,
+        ];
+    }
+
+    /**
+     * Used after a PDF fallback, where the document itself cannot carry an inline keyboard.
+     *
+     * @return array<string, mixed>
+     */
+    public function completionOnly(string $callback): array
     {
         return [
             'inline_keyboard' => [
-                [['text' => __('bot.delivery_images_button'), 'callback_data' => $imagesCallback]],
+                [['text' => '✅ تم', 'callback_data' => $callback]],
             ],
         ];
     }

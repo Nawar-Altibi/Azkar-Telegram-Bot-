@@ -13,6 +13,7 @@ use App\Models\AdhkarItem;
 use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
+use App\Services\AdhkarCompletionService;
 use App\Services\AdminReportService;
 use App\Services\AdminUserUsageService;
 use App\Services\BotEventRecorder;
@@ -54,6 +55,7 @@ class TelegramUpdateProcessor
         private readonly AdminReportService $reports,
         private readonly AdminUserUsageService $userUsage,
         private readonly ReminderCompletionService $completion,
+        private readonly AdhkarCompletionService $adhkarCompletions,
     ) {}
 
     /**
@@ -928,6 +930,12 @@ class TelegramUpdateProcessor
             return;
         }
 
+        if (str_starts_with($data, 'completion:done:')) {
+            $this->handleManualCompletion($user, substr($data, strlen('completion:done:')), $callbackId);
+
+            return;
+        }
+
         $this->replyOldButton($user, $callbackId);
     }
 
@@ -1320,6 +1328,8 @@ class TelegramUpdateProcessor
             return;
         }
 
+        $this->adhkarCompletions->complete($user, (string) $log->collection_key);
+
         $log->update([
             'status' => ReminderLogStatus::Completed,
             'completed_at' => now(),
@@ -1333,6 +1343,22 @@ class TelegramUpdateProcessor
             ? __('bot.completed_evening')
             : __('bot.completed_morning');
         $this->safeAnswer($callbackId, $text);
+    }
+
+    private function handleManualCompletion(User $user, string $group, string $callbackId): void
+    {
+        if ($this->adhkarCompletions->groupForCollection($group) === null) {
+            $this->safeAnswer($callbackId, __('bot.old_button'));
+
+            return;
+        }
+
+        $created = $this->adhkarCompletions->complete($user, $group);
+        $this->events->record($user, 'reading_completed', [
+            'scope' => 'manual',
+            'collection' => $group,
+        ]);
+        $this->safeAnswer($callbackId, $this->adhkarCompletions->confirmationText($group, $created));
     }
 
     /**
@@ -1470,7 +1496,7 @@ class TelegramUpdateProcessor
             : $this->content->fullKey($session['baseKey']);
         $isLast = $index === $total - 1;
         $text = $this->content->renderCard($headerKey, $items[$index], $index + 1, $total, $isLast);
-        $markup = $this->keyboards->readingNav($this->readingActions($session, $index, $total, $isLast));
+        $markup = $this->keyboards->readingNav($this->readingActions($user, $session, $index, $total, $isLast));
 
         try {
             $this->show($user, $text, $markup, $messageId);
@@ -1507,7 +1533,7 @@ class TelegramUpdateProcessor
      * @param  array{scope:string,period?:string,log:?ReminderLog,baseKey:string,phase:string,index:int}  $session
      * @return array{prev?:string,next?:string,switch_to_full?:string,switch_to_short?:string,continue?:string,done?:string,save?:string}
      */
-    private function readingActions(array $session, int $index, int $total, bool $isLast): array
+    private function readingActions(User $user, array $session, int $index, int $total, bool $isLast): array
     {
         $actions = [
             'save' => $this->saveCallback($session),
@@ -1537,8 +1563,13 @@ class TelegramUpdateProcessor
             $actions['continue'] = $this->readingCallback($session, 'f', 0);
         }
 
-        if ($isLast && $session['scope'] === 'log' && $session['log'] instanceof ReminderLog) {
-            $actions['done'] = 'reminder:done:'.$session['log']->id;
+        if ($isLast) {
+            $group = $this->adhkarCompletions->groupForCollection((string) $session['baseKey']);
+            if ($group !== null && ! $this->adhkarCompletions->isCompleted($user, $group)) {
+                $actions['done'] = $session['scope'] === 'log' && $session['log'] instanceof ReminderLog
+                    ? 'reminder:done:'.$session['log']->id
+                    : 'completion:done:'.$group;
+            }
         }
 
         return $actions;
@@ -1835,9 +1866,14 @@ class TelegramUpdateProcessor
      */
     private function deliverOfflineWird(User $user, string $headerKey, Collection $items, bool $fullOnly, string $tail, string $format): void
     {
+        $group = $this->adhkarCompletions->groupForCollection($headerKey);
+        $doneCallback = $group !== null && ! $this->adhkarCompletions->isCompleted($user, $group)
+            ? 'completion:done:'.$group
+            : null;
+
         if ($format === 'text') {
             try {
-                $this->sendWirdText($user->chat_id, $headerKey, $items, 'sx:images:'.$tail);
+                $this->sendWirdText($user->chat_id, $headerKey, $items, 'sx:images:'.$tail, $doneCallback);
             } catch (Throwable $exception) {
                 Log::channel('telegram')->error('Offline reading delivery failed', [
                     'user_id' => $user->id,
@@ -1859,7 +1895,7 @@ class TelegramUpdateProcessor
                     $fullOnly,
                     'sp:'.$tail,
                     followUpText: ($showHint ? __('bot.delivery_text_hint')."\n\n" : '').__('bot.pdf_print_hint'),
-                    followUpMarkup: $this->keyboards->wirdImagesFollowUp('sp:'.$tail, 'sx:text:'.$tail),
+                    followUpMarkup: $this->keyboards->wirdImagesFollowUp('sp:'.$tail, 'sx:text:'.$tail, $doneCallback),
                 );
                 if ($sent) {
                     if ($showHint) {
@@ -1872,6 +1908,9 @@ class TelegramUpdateProcessor
             }
 
             $this->wirds->sendPdf($user->chat_id, $headerKey, $items, $fullOnly);
+            if ($doneCallback !== null) {
+                $this->reply($user, __('bot.pdf_print_hint'), $this->keyboards->completionOnly($doneCallback));
+            }
 
             return;
         } catch (Throwable $exception) {
@@ -1883,8 +1922,16 @@ class TelegramUpdateProcessor
 
         try {
             $this->telegram->sendMessage($user->chat_id, __('bot.pdf_failed'));
-            foreach ($this->content->offlineMessages($headerKey, $items) as $message) {
-                $this->telegram->sendMessage($user->chat_id, $message);
+            $messages = $this->content->offlineMessages($headerKey, $items);
+            $last = array_key_last($messages);
+            foreach ($messages as $index => $message) {
+                $this->telegram->sendMessage(
+                    $user->chat_id,
+                    $message,
+                    $index === $last && $doneCallback !== null
+                        ? $this->keyboards->completionOnly($doneCallback)
+                        : [],
+                );
             }
         } catch (Throwable $exception) {
             Log::channel('telegram')->error('Offline reading delivery failed', [
@@ -1898,7 +1945,7 @@ class TelegramUpdateProcessor
     /**
      * @param  Collection<int, AdhkarItem>  $items
      */
-    private function sendWirdText(int $chatId, string $headerKey, Collection $items, string $imagesCallback): void
+    private function sendWirdText(int $chatId, string $headerKey, Collection $items, string $imagesCallback, ?string $doneCallback = null): void
     {
         $messages = $this->content->offlineMessages($headerKey, $items);
         $last = array_key_last($messages);
@@ -1906,7 +1953,7 @@ class TelegramUpdateProcessor
             $this->telegram->sendMessage(
                 $chatId,
                 $message,
-                $index === $last ? $this->keyboards->wirdTextSwitch($imagesCallback) : [],
+                $index === $last ? $this->keyboards->wirdTextSwitch($imagesCallback, $doneCallback) : [],
             );
         }
     }
