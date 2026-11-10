@@ -180,6 +180,20 @@ class BroadcastCommandTest extends TestCase
         $this->assertDatabaseCount('broadcast_deliveries', 1);
     }
 
+    public function test_vps_artisan_command_delivers_a_batch_without_the_http_cron_endpoint(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+        User::factory()->create(['telegram_id' => 2002, 'chat_id' => 2002]);
+
+        $this->process($this->telegramMessagePayload('/broadcast إشعار من المشرف', 121));
+        $this->artisan('adhkar:dispatch-broadcasts')->assertSuccessful();
+        $this->artisan('adhkar:dispatch-broadcasts')->assertSuccessful();
+
+        $this->assertSame('completed', Broadcast::query()->sole()->status);
+        $this->assertSame(2, Broadcast::query()->sole()->sent_count);
+        $this->assertDatabaseCount('broadcast_deliveries', 2);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
