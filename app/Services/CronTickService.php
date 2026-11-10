@@ -32,6 +32,7 @@ class CronTickService
     public function __construct(
         private readonly ReminderDispatchService $dispatcher,
         private readonly StaleRecoveryService $recovery,
+        private readonly BroadcastService $broadcasts,
     ) {}
 
     /**
@@ -47,6 +48,8 @@ class CronTickService
             'due_count' => 0,
             'sent_count' => 0,
             'failed_count' => 0,
+            'broadcast_sent' => 0,
+            'broadcast_failed' => 0,
             'stale_recovery_ran' => false,
             'stale_reminders_recovered' => 0,
             'stale_updates_recovered' => 0,
@@ -64,6 +67,10 @@ class CronTickService
                 $metrics['ok'] = true;
 
                 return $metrics;
+            }
+
+            if (hrtime(true) / 1e9 < $deadline) {
+                $metrics = $this->broadcasts->sendPending($deadline) + $metrics;
             }
 
             $logIds = $this->dispatcher->claimDueLogIds($deadline);
