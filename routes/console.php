@@ -14,3 +14,7 @@ Schedule::command('adhkar:dispatch-due-reminders')
 Schedule::command('adhkar:recover-stale')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command('adhkar:dispatch-broadcasts')
+    ->everyMinute()
+    ->withoutOverlapping();
