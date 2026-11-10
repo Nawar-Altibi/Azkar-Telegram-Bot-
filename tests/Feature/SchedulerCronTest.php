@@ -323,8 +323,8 @@ class SchedulerCronTest extends TestCase
 
         $this->cron()->assertOk();
 
-        // tick lock insert, due-user select, last-tick upsert, recovery marker read, lock owner check + delete.
-        $this->assertCount(6, $statements, implode("\n", $statements));
+        // tick lock insert, broadcast lookup, due-user select, last-tick upsert, recovery marker read, lock owner check + delete.
+        $this->assertCount(7, $statements, implode("\n", $statements));
     }
 
     public function test_stale_recovery_runs_by_elapsed_time_not_clock_boundary(): void

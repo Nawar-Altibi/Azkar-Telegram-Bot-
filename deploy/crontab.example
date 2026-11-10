@@ -1,4 +1,5 @@
 # Run Laravel's scheduler every minute. This drives:
 # - adhkar:dispatch-due-reminders (every minute)
 # - adhkar:recover-stale (every five minutes)
+# - adhkar:dispatch-broadcasts (every minute, up to configured batch size)
 * * * * * cd /var/www/azkar && php artisan schedule:run >> /dev/null 2>&1

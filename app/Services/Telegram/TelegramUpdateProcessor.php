@@ -14,6 +14,7 @@ use App\Models\ReminderLog;
 use App\Models\User;
 use App\Services\AdhkarContentService;
 use App\Services\AdhkarPdfService;
+use App\Services\BroadcastService;
 use App\Services\OnboardingService;
 use App\Services\ReminderScheduleCalculator;
 use App\Services\UserSettingsService;
@@ -37,6 +38,7 @@ class TelegramUpdateProcessor
         private readonly AdhkarContentService $content,
         private readonly AdhkarPdfService $pdf,
         private readonly KeyboardFactory $keyboards,
+        private readonly BroadcastService $broadcasts,
     ) {}
 
     /**
@@ -96,6 +98,14 @@ class TelegramUpdateProcessor
     private function handleMessage(User $user, IncomingUpdate $update): void
     {
         $text = trim((string) $update->message?->text);
+
+        // Preserve multiline content after /broadcast instead of passing only the command.
+        if (preg_match('/^\/broadcast(?:@[A-Za-z0-9_]+)?(?:\s|$)/iu', $text) === 1) {
+            $this->handleBroadcast($user, $update->updateId, $text);
+
+            return;
+        }
+
         $command = $this->extractCommand($text);
 
         if ($command !== null) {
@@ -128,6 +138,39 @@ class TelegramUpdateProcessor
             '/today' => $this->reply($user, __('bot.today_prompt'), $this->keyboards->todayMenu()),
             default => $this->reply($user, __('bot.unknown')),
         };
+    }
+
+    private function handleBroadcast(User $user, int $updateId, string $commandText): void
+    {
+        $admins = config('telegram.admin_ids', []);
+
+        // A private message from an explicitly configured Telegram numeric user ID only.
+        if ($user->chat_id !== $user->telegram_id
+            || ! in_array((string) $user->telegram_id, $admins, true)) {
+            $this->reply($user, __('bot.unknown'));
+
+            return;
+        }
+
+        $message = trim((string) preg_replace('/^\/broadcast(?:@[A-Za-z0-9_]+)?/iu', '', $commandText, 1));
+        if ($message === '') {
+            $this->reply($user, "اكتب الرسالة بعد الأمر، مثلاً:\n/broadcast السلام عليكم ورحمة الله وبركاته");
+
+            return;
+        }
+
+        if (mb_strlen(e($message)) > 4096) {
+            $this->reply($user, 'الرسالة طويلة جداً. اختصرها إلى أقل من 4096 حرفاً.');
+
+            return;
+        }
+
+        $broadcast = $this->broadcasts->enqueue($updateId, $user->telegram_id, $message);
+        $this->reply(
+            $user,
+            "✅ تم تسجيل الرسالة لإرسالها إلى {$broadcast->target_count} مستخدم. "
+            .'سيتم توزيعها على دفعات مع تشغيل المهام الدورية.',
+        );
     }
 
     private function handleReplyKeyboard(User $user, string $text): bool
