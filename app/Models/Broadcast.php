@@ -16,6 +16,7 @@ class Broadcast extends Model
         'sent_count',
         'failed_count',
         'status',
+        'retry_at',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class Broadcast extends Model
             'target_count' => 'integer',
             'sent_count' => 'integer',
             'failed_count' => 'integer',
+            'retry_at' => 'datetime',
         ];
     }
 }
