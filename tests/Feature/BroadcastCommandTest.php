@@ -141,6 +141,45 @@ class BroadcastCommandTest extends TestCase
         $this->assertDatabaseCount('broadcast_deliveries', 2);
     }
 
+    public function test_rate_limited_broadcast_retries_after_telegram_cooldown(): void
+    {
+        User::factory()->create(['telegram_id' => 1001, 'chat_id' => 1001]);
+        $rejectBroadcast = true;
+
+        Http::fake(function ($request) use (&$rejectBroadcast) {
+            if ($rejectBroadcast && ($request['text'] ?? '') === 'رسالة تجريبية') {
+                return Http::response([
+                    'ok' => false,
+                    'description' => 'Too Many Requests',
+                    'parameters' => ['retry_after' => 60],
+                ], 429);
+            }
+
+            return Http::response(['ok' => true, 'result' => ['message_id' => 1]], 200);
+        });
+
+        $this->process($this->telegramMessagePayload('/broadcast رسالة تجريبية', 111));
+        $this->cron();
+
+        $broadcast = Broadcast::query()->sole();
+        $this->assertSame(0, $broadcast->last_user_id);
+        $this->assertSame(0, $broadcast->failed_count);
+        $this->assertDatabaseCount('broadcast_deliveries', 0);
+        $this->assertNotNull($broadcast->retry_at);
+
+        $this->cron(); // Not yet eligible for retry.
+        $this->assertDatabaseCount('broadcast_deliveries', 0);
+
+        $rejectBroadcast = false;
+        $this->travel(61)->seconds();
+        $this->cron();
+        $this->cron();
+
+        $this->assertSame(1, $broadcast->fresh()->sent_count);
+        $this->assertSame('completed', $broadcast->fresh()->status);
+        $this->assertDatabaseCount('broadcast_deliveries', 1);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
