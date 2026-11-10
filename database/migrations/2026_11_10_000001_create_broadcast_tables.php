@@ -19,6 +19,7 @@ return new class extends Migration
             $table->unsignedInteger('sent_count')->default(0);
             $table->unsignedInteger('failed_count')->default(0);
             $table->string('status', 20)->default('pending')->index();
+            $table->timestamp('retry_at')->nullable();
             $table->timestamps();
         });
 
