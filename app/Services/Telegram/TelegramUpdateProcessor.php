@@ -100,7 +100,7 @@ class TelegramUpdateProcessor
         $text = trim((string) $update->message?->text);
 
         // Preserve multiline content after /broadcast instead of passing only the command.
-        if (preg_match('/^\\/broadcast(?:@[A-Za-z0-9_]+)?(?:\\s|$)/iu', $text) === 1) {
+        if (preg_match('/^\/broadcast(?:@[A-Za-z0-9_]+)?(?:\s|$)/iu', $text) === 1) {
             $this->handleBroadcast($user, $update->updateId, $text);
 
             return;
@@ -152,7 +152,7 @@ class TelegramUpdateProcessor
             return;
         }
 
-        $message = trim((string) preg_replace('/^\\/broadcast(?:@[A-Za-z0-9_]+)?/iu', '', $commandText, 1));
+        $message = trim((string) preg_replace('/^\/broadcast(?:@[A-Za-z0-9_]+)?/iu', '', $commandText, 1));
         if ($message === '') {
             $this->reply($user, "اكتب الرسالة بعد الأمر، مثلاً:\n/broadcast السلام عليكم ورحمة الله وبركاته");
 
