@@ -44,7 +44,12 @@ class BroadcastService
         $limit = max(1, min(20, (int) config('telegram.broadcast_batch_size', 10)));
         $processed = 0;
 
-        foreach (Broadcast::query()->where('status', 'pending')->orderBy('id')->limit(5)->get() as $broadcast) {
+        foreach (Broadcast::query()
+            ->where('status', 'pending')
+            ->where(fn ($query) => $query->whereNull('retry_at')->orWhere('retry_at', '<=', now()))
+            ->orderBy('id')
+            ->limit(5)
+            ->get() as $broadcast) {
             while ($processed < $limit) {
                 if ($deadline !== null && hrtime(true) / 1e9 >= $deadline) {
                     return $stats;
@@ -62,6 +67,7 @@ class BroadcastService
                     break;
                 }
 
+                $previousUserId = $broadcast->last_user_id;
                 $delivery = $this->reserveAttempt($broadcast, $user);
                 $broadcast->refresh();
                 if ($delivery === null) {
@@ -75,6 +81,14 @@ class BroadcastService
                     $broadcast->increment('sent_count');
                     $stats['broadcast_sent']++;
                 } catch (TelegramApiException $exception) {
+                    // A 429 is an explicit rejection, not an uncertain send:
+                    // restore the cursor and retry after Telegram's cooldown.
+                    if ($exception->httpStatus === 429) {
+                        $this->deferRateLimited($broadcast, $user, $delivery, $previousUserId, $exception);
+
+                        return $stats;
+                    }
+
                     $delivery->update([
                         'status' => 'failed',
                         'error_message' => Str::limit(TelegramClient::redact($exception->getMessage()), 500),
@@ -82,11 +96,6 @@ class BroadcastService
                     $broadcast->increment('failed_count');
                     $stats['broadcast_failed']++;
 
-                    // Respect flood-control responses; the failed recipient remains
-                    // recorded for manual review rather than risking duplicate sends.
-                    if ($exception->httpStatus === 429) {
-                        return $stats;
-                    }
                 } catch (Throwable $exception) {
                     $delivery->update([
                         'status' => 'unconfirmed',
@@ -111,6 +120,29 @@ class BroadcastService
         }
 
         return $stats;
+    }
+
+    private function deferRateLimited(
+        Broadcast $broadcast,
+        User $user,
+        BroadcastDelivery $delivery,
+        int $previousUserId,
+        TelegramApiException $exception,
+    ): void {
+        DB::transaction(function () use ($broadcast, $user, $delivery, $previousUserId, $exception) {
+            $locked = Broadcast::query()->whereKey($broadcast->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->last_user_id !== $user->id) {
+                return;
+            }
+
+            $locked->last_user_id = $previousUserId;
+            $locked->retry_at = now()->addSeconds(
+                max(1, (int) data_get($exception->payload, 'parameters.retry_after', 60))
+            );
+            $locked->save();
+            $delivery->delete();
+        });
     }
 
     private function reserveAttempt(Broadcast $broadcast, User $user): ?BroadcastDelivery
