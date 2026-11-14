@@ -168,6 +168,27 @@ class FeedbackTest extends TestCase
         Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ملاحظات كثيرة'));
     }
 
+    public function test_ghalias_telegram_id_also_has_unlimited_feedback(): void
+    {
+        config(['telegram.feedback_per_hour' => 1]);
+        User::factory()->create(['telegram_id' => 6220930099, 'chat_id' => 1001, 'username' => 'renamed_account']);
+
+        foreach ([1, 3] as $id) {
+            $payload = $this->telegramMessagePayload('/feedback', $id);
+            $payload['message']['from']['id'] = 6220930099;
+            $payload['message']['from']['username'] = 'renamed_account';
+            $this->handle($payload);
+
+            $note = $this->telegramMessagePayload('ملاحظة '.$id, $id + 1);
+            $note['message']['from']['id'] = 6220930099;
+            $note['message']['from']['username'] = 'renamed_account';
+            $this->handle($note);
+        }
+
+        $this->assertSame(2, Feedback::query()->count());
+        Http::assertNotSent(fn ($request) => str_contains((string) ($request['text'] ?? ''), 'ملاحظات كثيرة'));
+    }
+
     public function test_admin_messages_that_are_not_replies_to_feedback_work_as_usual(): void
     {
         User::factory()->create(['telegram_id' => self::ADMIN, 'chat_id' => self::ADMIN]);

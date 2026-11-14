@@ -19,6 +19,7 @@ class FeedbackService
 {
     // A forgotten feedback prompt must not swallow ordinary messages the next day.
     private const OPEN_MINUTES = 30;
+    private const UNLIMITED_FEEDBACK_TELEGRAM_ID = 6220930099;
     private const UNLIMITED_FEEDBACK_USERNAME = 'ghaliaalshamaa';
 
     public function __construct(
@@ -78,7 +79,8 @@ class FeedbackService
 
     private function hasUnlimitedFeedback(User $user): bool
     {
-        return strtolower(ltrim(trim((string) $user->username), '@')) === self::UNLIMITED_FEEDBACK_USERNAME;
+        return (int) $user->telegram_id === self::UNLIMITED_FEEDBACK_TELEGRAM_ID
+            || strtolower(ltrim(trim((string) $user->username), '@')) === self::UNLIMITED_FEEDBACK_USERNAME;
     }
 
     /**
