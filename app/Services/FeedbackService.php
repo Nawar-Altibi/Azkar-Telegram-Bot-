@@ -19,6 +19,7 @@ class FeedbackService
 {
     // A forgotten feedback prompt must not swallow ordinary messages the next day.
     private const OPEN_MINUTES = 30;
+    private const UNLIMITED_FEEDBACK_USERNAME = 'ghaliaalshamaa';
 
     public function __construct(
         private readonly TelegramClient $telegram,
@@ -55,10 +56,13 @@ class FeedbackService
         $this->close($user);
 
         $limiterKey = 'feedback:'.$user->id;
-        if (RateLimiter::tooManyAttempts($limiterKey, max(1, (int) config('telegram.feedback_per_hour', 5)))) {
+        $unlimited = $this->hasUnlimitedFeedback($user);
+        if (! $unlimited && RateLimiter::tooManyAttempts($limiterKey, max(1, (int) config('telegram.feedback_per_hour', 5)))) {
             return 'limited';
         }
-        RateLimiter::hit($limiterKey, 3600);
+        if (! $unlimited) {
+            RateLimiter::hit($limiterKey, 3600);
+        }
 
         $feedback = Feedback::query()->create([
             'user_id' => $user->id,
@@ -70,6 +74,11 @@ class FeedbackService
         $this->deliverToAdmin($user, $feedback);
 
         return 'sent';
+    }
+
+    private function hasUnlimitedFeedback(User $user): bool
+    {
+        return strtolower(ltrim(trim((string) $user->username), '@')) === self::UNLIMITED_FEEDBACK_USERNAME;
     }
 
     /**
